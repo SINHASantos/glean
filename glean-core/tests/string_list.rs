@@ -18,25 +18,25 @@ fn list_can_store_multiple_items() {
     let list: StringListMetric = StringListMetric::new(CommonMetricData {
         name: "list".into(),
         category: "local".into(),
-        send_in_pings: vec!["core".into()],
+        send_in_pings: vec!["store1".into()],
         ..Default::default()
     });
 
     list.add_sync(&glean, "first");
-    assert_eq!(list.get_value(&glean, "core").unwrap(), vec!["first"]);
+    assert_eq!(list.get_value(&glean, "store1").unwrap(), vec!["first"]);
 
     list.add_sync(&glean, "second");
     assert_eq!(
-        list.get_value(&glean, "core").unwrap(),
+        list.get_value(&glean, "store1").unwrap(),
         vec!["first", "second"]
     );
 
     list.set_sync(&glean, vec!["third".into()]);
-    assert_eq!(list.get_value(&glean, "core").unwrap(), vec!["third"]);
+    assert_eq!(list.get_value(&glean, "store1").unwrap(), vec!["third"]);
 
     list.add_sync(&glean, "fourth");
     assert_eq!(
-        list.get_value(&glean, "core").unwrap(),
+        list.get_value(&glean, "store1").unwrap(),
         vec!["third", "fourth"]
     );
 }
@@ -63,7 +63,7 @@ fn stringlist_serializer_should_correctly_serialize_stringlists() {
     }
 
     {
-        let (glean, _) = new_glean(Some(tempdir));
+        let (glean, _t) = new_glean(Some(tempdir));
 
         let snapshot = StorageManager
             .snapshot_as_json(glean.storage(), "store1", true)
@@ -121,7 +121,7 @@ fn long_string_values_are_truncated() {
 
     // Ensure the string was truncated to the proper length.
     assert_eq!(
-        vec![test_string[..50].to_string()],
+        vec![test_string[..100].to_string()],
         metric.get_value(&glean, "store1").unwrap()
     );
 
@@ -135,7 +135,7 @@ fn long_string_values_are_truncated() {
 
     // Ensure the string was truncated to the proper length.
     assert_eq!(
-        vec![test_string[..50].to_string()],
+        vec![test_string[..100].to_string()],
         metric.get_value(&glean, "store1").unwrap()
     );
 
@@ -186,18 +186,18 @@ fn string_lists_dont_exceed_max_items() {
         ..Default::default()
     });
 
-    for _n in 1..21 {
+    for _n in 1..101 {
         metric.add_sync(&glean, "test_string");
     }
 
     let expected: Vec<String> = "test_string "
-        .repeat(20)
+        .repeat(100)
         .split_whitespace()
         .map(|s| s.to_string())
         .collect();
     assert_eq!(expected, metric.get_value(&glean, "store1").unwrap());
 
-    // Ensure the 21st string wasn't added.
+    // Ensure the 101st string wasn't added.
     metric.add_sync(&glean, "test_string");
     assert_eq!(expected, metric.get_value(&glean, "store1").unwrap());
 
@@ -207,9 +207,9 @@ fn string_lists_dont_exceed_max_items() {
         test_get_num_recorded_errors(&glean, metric.meta(), ErrorType::InvalidValue)
     );
 
-    // Try to set it to a list that's too long. Ensure it cuts off at 20 elements.
+    // Try to set it to a list that's too long. Ensure it cuts off at 100 elements.
     let too_many: Vec<String> = "test_string "
-        .repeat(21)
+        .repeat(101)
         .split_whitespace()
         .map(|s| s.to_string())
         .collect();

@@ -15,6 +15,9 @@ definitions:
         ignore: /.*/
       tags:
         only: /^v.*/
+  - ci_filters: &ci-filters
+      branches:
+        ignore: release
 
 ##########################################################################
 # COMMANDS
@@ -39,8 +42,9 @@ commands:
       - run:
           name: Turn on RUST_BACKTRACE and RUST_LOG for any job that installs rustc
           command: |
-              echo "export RUST_BACKTRACE=1" >> $BASH_ENV
-              echo "export RUST_LOG=glean_core=debug" >> $BASH_ENV
+            echo "export RUST_BACKTRACE=1" >> $BASH_ENV
+            echo "export RUST_LOG=glean_core=debug" >> $BASH_ENV
+            echo "export CARGO_INCREMENTAL=0" >> $BASH_ENV
       - run:
           name: Setup Rust toolchain
           command: |
@@ -59,29 +63,72 @@ commands:
       - setup-rust-toolchain:
           rust-version: <<parameters.rust-version>>
       - run:
-          name: Test
-          command: |
-            export GLEAN_TEST_COVERAGE=$(realpath glean_coverage.txt)
-            cargo test --verbose --jobs 6 -- --nocapture
-      - run:
           name: Install required Python dependencies
           command: |
             sudo apt update
             sudo apt install --yes --no-install-recommends \
               python3-pip \
-              python3.8-venv
+              python3.10-venv
+
+      - run:
+          name: Install nextest
+          command: |
+            NEXTEST_SHA256=bde8d231e435099b068e654c591224defe686c784b4920682ee12784b6bfcf9e
+            NEXTEST=cargo-nextest
+            curl -sfSL --retry 5 -o "${NEXTEST}.tar.gz" "https://get.nexte.st/0.9.87/linux"
+            echo "${NEXTEST_SHA256} *${NEXTEST}.tar.gz" | shasum -a 256 -c -
+            tar -xf "${NEXTEST}.tar.gz"
+            cp ./${NEXTEST} ~/.cargo/bin/
+      - run:
+          name: Install circleci-junit-fix
+          command: |
+            JUNIT_FIX_SHA256=e8dd9012c841d9c03037783db676aa43a2ac1900346ccf4a61bf9956acfc6032
+            JUNIT_FIX=circleci-junit-fix
+            JUNIT_FIX_VERSION=v0.2.0
+            curl -sfSL --retry 5 -o "${JUNIT_FIX}.tar.gz" "https://github.com/conradludgate/circleci-junit-fix/releases/download/${JUNIT_FIX_VERSION}/${JUNIT_FIX}-${JUNIT_FIX_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+            echo "${JUNIT_FIX_SHA256} *${JUNIT_FIX}.tar.gz" | shasum -a 256 -c -
+            tar -xf "${JUNIT_FIX}.tar.gz"
+            cp ./${JUNIT_FIX} ~/.cargo/bin/
+      - run:
+          name: Test
+          command: |
+            cargo nextest run --profile ci
+      - run:
+          name: Fix junit output
+          command: |
+            mkdir -p ~/test-results/
+            cat target/nextest/ci/junit.xml | circleci-junit-fix > ~/test-results/junit.xml
+          when: always
+      - store_test_results:
+          path: ~/test-results
       - run:
           name: Run Rust sample
           command: |
-            if rustc --version | grep -q 'rustc 1.6'; then
-              cargo run -p sample
-            fi
+            cargo run -p sample
       - run:
-          name: Upload coverage report
+          name: Run Rust RLB test
           command: |
-            pip3 install glean_parser
-            glean_parser coverage --allow-reserved -c glean_coverage.txt -f codecovio -o codecov.json glean-core/metrics.yaml
-            bin/codecov.sh -X yaml -f codecov.json
+            glean-core/rlb/tests/test-shutdown-blocking.sh
+      - run:
+          name: Run Rust RLB crash test
+          command: |
+            glean-core/rlb/tests/test-thread-crashing.sh
+      - run:
+          name: Run Rust RLB delayed ping data test
+          command: |
+            glean-core/rlb/tests/test-delayed-ping-data.sh
+      - run:
+          name: Run Rust RLB flush test
+          command: |
+            glean-core/rlb/tests/test-ping-lifetime-flush.sh
+      - run:
+          name: Run Rust RLB enabled-pings test
+          command: |
+            glean-core/rlb/tests/test-enabled-pings.sh
+      - run:
+          name: Run Rust RLB pending-gets-removed test
+          command: |
+            glean-core/rlb/tests/test-pending-gets-removed.sh
 
   install-rustup:
     steps:
@@ -91,16 +138,16 @@ commands:
       - run:
           name: Setup custom environment variables
           command: |
-              echo 'export PATH=$HOME/.cargo/bin:$PATH' >> $BASH_ENV
+            echo 'export PATH=$HOME/.cargo/bin:$PATH' >> $BASH_ENV
 
   install-android-ndk:
     steps:
       - run:
           name: Install missing Android SDK & NDK
           command: |
-              sdkmanager \
-                "build-tools;33.0.0" \
-                "ndk;25.1.8937393"
+            sdkmanager \
+              "build-tools;34.0.0" \
+              "ndk;26.2.11394342"
 
   android-setup:
     steps:
@@ -111,7 +158,7 @@ commands:
       - run:
           name: Restrict to Linux builds only
           command: |
-              echo "rust.targets=linux-x86-64" > local.properties
+            echo "rust.targets=linux-x86-64" > local.properties
 
   test-python:
     steps:
@@ -120,8 +167,8 @@ commands:
       - run:
           name: Remove coredump file restriction
           command: |
-              # tell the operating system to remove the file size limit on core dump files
-              ulimit -c unlimited
+            # tell the operating system to remove the file size limit on core dump files
+            ulimit -c unlimited
       - run:
           name: Python tests
           command: |
@@ -131,9 +178,9 @@ commands:
           name: Detect and gather coredump files
           when: always
           command: |
-              mkdir -p ~/coredumps
-              # Try to copy the core file(s). Don't fail if they don't exist.
-              cp core.* ~/coredumps || true
+            mkdir -p ~/coredumps
+            # Try to copy the core file(s). Don't fail if they don't exist.
+            cp core.* ~/coredumps || true
       - store_artifacts:
           path: ~/coredumps
           destination: coredumps
@@ -146,34 +193,25 @@ commands:
       - run:
           name: Install Python development tools for host
           command:
-            make python-setup
+            make setup-python
       - run:
           name: Build Windows wheel
           command: |
-            cd glean-core/python
-            .venv3.8/bin/python3 setup.py bdist_wheel
-          environment:
-            GLEAN_BUILD_TARGET: x86_64-pc-windows-gnu
-            GLEAN_BUILD_VARIANT: release
+            make build-python-wheel GLEAN_BUILD_TARGET=x86_64-pc-windows-gnu
 
   build-windows-i686-wheel:
     steps:
       - install-rustup
-      - setup-rust-toolchain:
-          rust-version: "1.58.0"
+      - setup-rust-toolchain
       - install-mingw
       - run:
           name: Install Python development tools for host
           command:
-            make python-setup
+            make setup-python
       - run:
           name: Build Windows wheel
           command: |
-            cd glean-core/python
-             .venv3.8/bin/python3 setup.py bdist_wheel
-          environment:
-            GLEAN_BUILD_TARGET: i686-pc-windows-gnu
-            GLEAN_BUILD_VARIANT: release
+            make build-python-wheel GLEAN_BUILD_TARGET=i686-pc-windows-gnu
 
   install-python-windows-deps:
     steps:
@@ -191,7 +229,7 @@ commands:
             # requirements_dev.txt
             find ~/.cache/pip -name "*.whl" -exec $WINPYTHON -m pip install {} \;
             $WINPYTHON -m pip install -r glean-core/python/requirements_dev.txt --no-warn-script-location
-            $WINPYTHON -m pip install glean-core/python/dist/*.whl --no-warn-script-location
+            $WINPYTHON -m pip install target/wheels/*.whl --no-warn-script-location
 
   install-mingw:
     steps:
@@ -217,9 +255,9 @@ commands:
       - run:
           name: Get ghr release tool
           command: |
-            GHR_VERSION=v0.14.0
-            GHR=ghr_${GHR_VERSION}_darwin_amd64
-            GHR_SHA256=33e9c89d611b049a2cb7ace8334108e8c586ea37a713f59c8503df582710b679
+            GHR_VERSION=v0.16.2
+            GHR=ghr_${GHR_VERSION}_darwin_arm64
+            GHR_SHA256=f762742b3a1a6a10c87ca1bfcc043e9e535ce4d1defa02e4e9d5a4875c1116ba
             curl -sfSL --retry 5 -O "https://github.com/tcnksm/ghr/releases/download/${GHR_VERSION}/${GHR}.zip"
             echo "${GHR_SHA256} *${GHR}.zip" | shasum -a 256 -c -
             unzip "${GHR}.zip"
@@ -230,9 +268,9 @@ commands:
       - run:
           name: Get ghr release tool
           command: |
-            GHR_VERSION=v0.14.0
+            GHR_VERSION=v0.16.2
             GHR=ghr_${GHR_VERSION}_linux_amd64
-            GHR_SHA256=08fd71402df6aace23403ef3757dabc7e261d6b24fed5a0634e2275c71303c31
+            GHR_SHA256=084ed9819dff71ea77f77a3071a643b6d1cbe5d2ab57bb5f56bb23de17189cd0
             curl -sfSL --retry 5 -O "https://github.com/tcnksm/ghr/releases/download/${GHR_VERSION}/${GHR}.tar.gz"
             echo "${GHR_SHA256} *${GHR}.tar.gz" | sha256sum -c -
             tar -xf "${GHR}.tar.gz"
@@ -244,15 +282,15 @@ jobs:
 
   License check:
     docker:
-      - image: cimg/rust:1.61
+      - image: cimg/rust:1.76
     steps:
       - checkout
       - run:
           name: Install cargo-deny
           command: |
-            DENY_VERSION=0.11.0
+            DENY_VERSION=0.14.20
             DENY="cargo-deny-${DENY_VERSION}-x86_64-unknown-linux-musl"
-            DENY_SHA256=bdac664b436fd8501b3bea5461bbf8566086ab0cf5555d83178c3209a848f9f8
+            DENY_SHA256=1c9f8cfc23647346f1aa7ba0ed3167191f3198aba3dc5a957fda6f85a82fc424
             curl -sfSL --retry 5 -O "https://github.com/EmbarkStudios/cargo-deny/releases/download/${DENY_VERSION}/${DENY}.tar.gz"
             echo "${DENY_SHA256} *${DENY}.tar.gz" | shasum -a 256 -c -
             tar -xvf "${DENY}.tar.gz"
@@ -261,10 +299,13 @@ jobs:
       - run:
           name: Run license check
           command: cargo deny check licenses
+      - run:
+          name: Run dependency ban check
+          command: cargo deny check bans
 
   Check vendored schema:
     docker:
-      - image: cimg/rust:1.61
+      - image: cimg/rust:1.76
     steps:
       - checkout
       - run:
@@ -294,7 +335,7 @@ jobs:
 
   Check Rust formatting:
     docker:
-      - image: cimg/rust:1.61
+      - image: cimg/rust:1.76
     steps:
       - checkout
       - run: rustup component add rustfmt
@@ -303,7 +344,7 @@ jobs:
 
   Lint Rust with clippy:
     docker:
-      - image: cimg/rust:1.61
+      - image: cimg/rust:1.76
     steps:
       - checkout
       - run: rustup component add clippy
@@ -313,36 +354,46 @@ jobs:
           command: |
             sudo apt update
             sudo apt install --yes --no-install-recommends \
-              python3.8-venv
+              python3.10-venv
       - run:
           name: Clippy
           command: make lint-rust
 
   Rust tests - stable:
     docker:
-      - image: cimg/rust:1.61
+      - image: cimg/rust:1.76
     resource_class: "medium+"
     steps:
       - test-rust
+      # RLB Windows compile test
+      - install-mingw
+      - run:
+          name: Check RLB on Windows x86_64
+          command: |
+            cargo check -p glean --examples --tests --target x86_64-pc-windows-gnu
+      - run:
+          name: Check RLB on Windows i686
+          command: |
+            cargo check -p glean --examples --tests --target i686-pc-windows-gnu
 
   Rust tests - beta:
     docker:
-      - image: cimg/rust:1.61
+      - image: cimg/rust:1.76
     steps:
       - test-rust:
           rust-version: "beta"
 
   Rust tests - minimum version:
     docker:
-      - image: cimg/rust:1.58
+      - image: cimg/rust:1.76
     resource_class: "medium+"
     steps:
       - test-rust:
-          rust-version: "1.58.0"
+          rust-version: "1.76.0"
 
   Generate Rust documentation:
     docker:
-      - image: cimg/rust:1.61
+      - image: cimg/rust:1.76
     steps:
       - checkout
       - run:
@@ -351,9 +402,9 @@ jobs:
       - run:
           name: Install mdbook-dtmo
           command: |
-              MDBOOK_VERSION=0.10.0
-              MDBOOK="mdbook-dtmo-${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
-              MDBOOK_SHA256=96d30648b21cf443d64bd181cc58c8f2ba0d98b1e390e96d4639ae1ec5985ae3
+              MDBOOK_VERSION=0.15.2
+              MDBOOK="mdbook-dtmo-${MDBOOK_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+              MDBOOK_SHA256=87f5cb874faadc745f033b646d358669b172edf19d2ca0a4e291a9c627e52e13
               curl -sfSL --retry 5 -O "https://github.com/badboy/mdbook-dtmo/releases/download/${MDBOOK_VERSION}/${MDBOOK}"
               echo "${MDBOOK_SHA256} *${MDBOOK}" | shasum -a 256 -c -
               tar -xvf "${MDBOOK}"
@@ -374,14 +425,14 @@ jobs:
 
   Publish Rust crates:
     docker:
-      - image: cimg/rust:1.61
+      - image: cimg/rust:1.80
     steps:
       - checkout
       - run:
           name: Publish Cargo Package
           command: |
             # Login to crates.io so the following commands work
-            cargo login -- "$CRATES_IO_TOKEN"
+            cargo login "$CRATES_IO_TOKEN"
 
             # Publish all crates from CI.
             # The token is set in CircleCI settings.
@@ -390,7 +441,6 @@ jobs:
             pushd glean-core
             cargo publish --verbose
 
-            sleep 30
             pushd rlb
             cargo publish --verbose
 
@@ -399,7 +449,7 @@ jobs:
 
   Lint Android with ktlint and detekt:
     docker:
-      - image: cimg/android:2022.07.1
+      - image: cimg/android:2024.01.1-browsers
     steps:
       - checkout
       - android-setup
@@ -409,7 +459,7 @@ jobs:
 
   Android tests:
     docker:
-      - image: cimg/android:2022.07.1
+      - image: cimg/android:2024.01.1-browsers
     steps:
       - checkout
       - skip-if-doc-only
@@ -417,8 +467,8 @@ jobs:
       - run:
           name: Remove coredump file restriction
           command: |
-              # tell the operating system to remove the file size limit on core dump files
-              ulimit -c unlimited
+            # tell the operating system to remove the file size limit on core dump files
+            ulimit -c unlimited
       - run:
           name: Android tests
           command: ./gradlew --no-daemon :glean:testDebugUnitTest
@@ -428,10 +478,10 @@ jobs:
       - run:
           name: Save test results
           command: |
-              mkdir -p ~/test-results/junit/
-              mkdir -p ~/test-results/tests/
-              cp -a glean-core/android/build/reports/tests ~/test-results/
-              find glean-core/android/build -type f -regex ".*/build/test-results/.*xml" -exec cp {} ~/test-results/junit/ \;
+            mkdir -p ~/test-results/junit/
+            mkdir -p ~/test-results/tests/
+            cp -a glean-core/android/build/reports/tests ~/test-results/
+            find glean-core/android/build -type f -regex ".*/build/test-results/.*xml" -exec cp {} ~/test-results/junit/ \;
           when: always
       - store_artifacts:
           path: ~/test-results/tests
@@ -439,11 +489,11 @@ jobs:
       - run:
           name: Detect and gather coredump files
           command: |
-              mkdir -p ~/coredumps
-              # Try to copy the core file from a default location. Don't fail if it doesn't exist.
-              cp -a glean-core/android/core ~/coredumps || true
-              # The JVM/Gradle might also produce a log file named like "hs_err_pid3247.log", let's copy that as well
-              find . -type f -name "hs_*.log" | xargs -I% cp -a % ~/coredumps/%
+            mkdir -p ~/coredumps
+            # Try to copy the core file from a default location. Don't fail if it doesn't exist.
+            cp -a glean-core/android/core ~/coredumps || true
+            # The JVM/Gradle might also produce a log file named like "hs_err_pid3247.log", let's copy that as well
+            find . -type f -name "hs_*.log" | xargs -I% cp -a % ~/coredumps/%
       - store_artifacts:
           path: ~/coredumps
           destination: coredumps
@@ -452,7 +502,7 @@ jobs:
       - run:
           name: Build Android Sample App
           command: |
-              ./gradlew :glean-sample-app:assembleAndroidTest
+            ./gradlew :glean-sample-app:assembleAndroidTest
           environment:
             GRADLE_OPTS: -Xmx2048m
             TARGET_CFLAGS: -DNDEBUG
@@ -462,16 +512,16 @@ jobs:
 
   Check Swift formatting:
     macos:
-      xcode: "14.0"
+      xcode: "15.1"
+    resource_class: "macos.m1.medium.gen1"
     steps:
       - checkout
       - run:
           name: Install lint tools
           command: |
             export HOMEBREW_NO_AUTO_UPDATE=1
-            # swiftlint 0.50.1
-            curl https://raw.githubusercontent.com/Homebrew/homebrew-core/dd10ef27e1327dd3dfc6f428565a83402d4abc24/Formula/swiftlint.rb > swiftlint.rb
-            brew install ./swiftlint.rb
+            export HOMEBREW_NO_INSTALL_CLEANUP=1
+            brew install swiftlint
       - run:
           name: Run swiftlint
           command: |
@@ -480,7 +530,8 @@ jobs:
 
   iOS build and test:
     macos:
-      xcode: "13.4.1"
+      xcode: "15.1"
+    resource_class: "macos.m1.medium.gen1"
     steps:
       - checkout
       - run:
@@ -492,16 +543,16 @@ jobs:
       - setup-rust-toolchain
       - restore_cache:
           name: Restore rubygems cache
-          key: swift-docs-gems-v13
+          key: swift-docs-gems-v20
       - run:
           name: Install jazzy
-          command: gem install jazzy
+          command: gem install --no-document jazzy
       - save_cache:
           name: Save rubygems cache
           # NEEDS TO CHANGE WHEN JAZZY OR RUBY IS UPDATED
-          key: swift-docs-gems-v13
+          key: swift-docs-gems-v20
           paths:
-            - ~/.gem/ruby/2.7.6
+            - ~/.rbenv/versions/3.1.4/lib/ruby/gems/3.1.0
       - run:
           name: Setup build environment
           command: |
@@ -510,14 +561,14 @@ jobs:
 
             # For some reason everything works fine if we use the host clang,
             # not the Xcode-bundled clang.
-            echo '[target.x86_64-apple-darwin]' >> ~/.cargo/config
-            echo 'linker = "/usr/bin/clang"' >> ~/.cargo/config
+            echo '[target.aarch64-apple-darwin]' >> ~/.cargo/config
+            echo 'linker = "/usr/bin/cc"' >> ~/.cargo/config
 
             # List available devices -- allows us to see what's there
             DEVICES=$(xcrun xctrace list devices 2>&1)
             echo "$DEVICES"
             # Pick a device and start it
-            UUID=$(echo "$DEVICES" | grep --max-count=1 'iPhone 11 Simulator (14' | awk -F'[()]' '{print $4}')
+            UUID=$(echo "$DEVICES" | grep --max-count=1 'iPhone 15 Simulator (17' | awk -F'[()]' '{print $4}')
             xcrun simctl boot "$UUID"
             # Store build type for use in cache key
             if [ -z "${CIRCLE_TAG}" ]; then
@@ -537,10 +588,6 @@ jobs:
             - target
           key: v2-cargo-cache-{{arch}}-{{checksum "buildtype.txt"}}-{{checksum "Cargo.lock"}}
       - run:
-          name: Configure device logging
-          command: |
-            xcrun simctl spawn booted log config --mode "level:debug" --subsystem org.mozilla.glean-sample-app
-      - run:
           name: Run iOS tests
           command: |
             if git log -1 "$CIRCLE_SHA1" | grep -q '\[doc only\]'; then
@@ -550,25 +597,22 @@ jobs:
             fi
       - run:
           name: Generate Swift documentation
-          command: bash bin/build-swift-docs.sh
+          command: |
+            # Skip doc generation for pull requests.
+            if [ "$CIRCLE_BRANCH" = "main" ]; then
+              bash bin/build-swift-docs.sh
+            else
+              mkdir -p build/docs/swift
+            fi
       - store_artifacts:
           path: raw_xcodebuild.log
           destination: raw_xcodebuild.log
       - store_artifacts:
           path: raw_xcodetest.log
           destination: raw_xcodetest.log
-      - run:
-          name: Collect device logs
-          command: |
-            xcrun simctl spawn booted log collect --output $(pwd)/ios-tests.logarchive
-            zip -r $(pwd)/device_logs.zip $(pwd)/ios-tests.logarchive
-      - store_artifacts:
-          path: device_logs.zip
-          destination: device_logs.zip
       - persist_to_workspace:
           root: build/
           paths: docs/swift
-      - skip-if-doc-only
       - run:
           name: Build XCFramework archive
           no_output_timeout: 20m
@@ -586,7 +630,8 @@ jobs:
 
   iOS integration test:
     macos:
-      xcode: "13.4.1"
+      xcode: "15.1"
+    resource_class: "macos.m1.medium.gen1"
     steps:
       - checkout
       - skip-if-doc-only
@@ -600,19 +645,19 @@ jobs:
 
             # For some reason everything works fine if we use the host clang,
             # not the Xcode-bundled clang.
-            echo '[target.x86_64-apple-darwin]' >> ~/.cargo/config
-            echo 'linker = "/usr/bin/clang"' >> ~/.cargo/config
+            echo '[target.aarch64-apple-darwin]' >> ~/.cargo/config
+            echo 'linker = "/usr/bin/cc"' >> ~/.cargo/config
 
             # List available devices -- allows us to see what's there
             DEVICES=$(xcrun xctrace list devices 2>&1)
             echo "$DEVICES"
             # Pick a device and start it
-            UDID=$(echo "$DEVICES" | grep --max-count=1 'iPhone 11 Simulator (14' | awk -F'[()]' '{print $4}')
-            xcrun simctl boot "$UDID"
+            UUID=$(echo "$DEVICES" | grep --max-count=1 'iPhone 15 Simulator (17' | awk -F'[()]' '{print $4}')
+            xcrun simctl boot "$UUID"
       - run:
           name: Build XCFramework archive
           command: |
-              bash bin/build-xcframework.sh
+            bash bin/build-xcframework.sh
       - run:
           name: Build sample app
           command: |
@@ -621,29 +666,17 @@ jobs:
           path: raw_sample_xcodebuild.log
           destination: raw_sample_xcodebuild.log
       - run:
-          name: Configure device logging
-          command: |
-            xcrun simctl spawn booted log config --mode "level:debug" --subsystem org.mozilla.glean-sample-app
-      - run:
           name: Run sample app tests
           command: |
             bash bin/run-ios-sample-app-test.sh
       - store_artifacts:
           path: raw_sample_xcodetest.log
           destination: raw_sample_xcodetest.log
-      - run:
-          name: Collect device logs
-          command: |
-            xcrun simctl spawn booted log collect --output $(pwd)/ios-integration-test.logarchive
-            zip -r $(pwd)/device_logs.zip $(pwd)/ios-integration-test.logarchive
-          when: always
-      - store_artifacts:
-          path: device_logs.zip
-          destination: device_logs.zip
 
   iOS Framework release:
     macos:
-      xcode: "13.4.1"
+      xcode: "15.1"
+    resource_class: "macos.m1.medium.gen1"
     steps:
       - checkout
       - attach_workspace:
@@ -656,7 +689,7 @@ jobs:
 
   glean-swift release:
     docker:
-      - image: cimg/rust:1.61
+      - image: cimg/rust:1.76
     steps:
       - checkout
       - attach_workspace:
@@ -664,9 +697,9 @@ jobs:
       - run:
           name: Release glean-swift
           command: |
-              git config --global user.email "jrediger@mozilla.com"
-              git config --global user.name "Glean automated release"
-              ./bin/publish-glean-swift.sh "${CIRCLE_TAG}"
+            git config --global user.email "jrediger@mozilla.com"
+            git config --global user.name "Glean automated release"
+            ./bin/publish-glean-swift.sh "${CIRCLE_TAG}"
 
   ###########################################################################
   # Python
@@ -684,59 +717,18 @@ jobs:
           name: Python lints
           command: make lint-python
 
-  Python 3_6 tests:
-    docker:
-      - image: cimg/python:3.6
-    steps:
-      - checkout
-      - skip-if-doc-only
-      - test-python
-
-  Python 3_6 tests minimum dependencies:
-    docker:
-      - image: cimg/python:3.6
-    steps:
-      - checkout
-      - skip-if-doc-only
-      - run:
-          command: |
-              echo "export GLEAN_PYDEPS=min" >> $BASH_ENV
-      - test-python
-
-  Python 3_7 tests:
-    docker:
-      - image: cimg/python:3.7
-    steps:
-      - checkout
-      - skip-if-doc-only
-      - test-python
-
   Python 3_8 tests:
     docker:
       - image: cimg/python:3.8
     steps:
       - checkout
       - test-python
-      - persist_to_workspace:
-          root: glean-core/python/
-          paths: .venv3.8
 
   Python 3_9 tests:
     docker:
       - image: cimg/python:3.9
     steps:
       - checkout
-      - test-python
-
-  Python 3_9 tests minimum dependencies:
-    docker:
-      - image: cimg/python:3.9
-    steps:
-      - checkout
-      - skip-if-doc-only
-      - run:
-          command: |
-              echo "export GLEAN_PYDEPS=min" >> $BASH_ENV
       - test-python
 
   Python 3_9 on Alpine tests:
@@ -759,6 +751,23 @@ jobs:
     steps:
       - checkout
       - test-python
+      - persist_to_workspace:
+          root: .
+          paths: .venv3.10
+
+  Python 3_11 tests:
+    docker:
+      - image: cimg/python:3.11
+    steps:
+      - checkout
+      - test-python
+
+  Python 3_12 tests:
+    docker:
+      - image: cimg/python:3.12
+    steps:
+      - checkout
+      - test-python
 
   Python Windows x86_64 tests:
     docker:
@@ -777,8 +786,15 @@ jobs:
             wget https://www.python.org/ftp/python/3.8.2/python-3.8.2-embed-amd64.zip
             mkdir winpython
             unzip python-3.8.2-embed-amd64.zip -d winpython
-            echo "export WINPYTHON=\"wine64 winpython/python.exe\"" >> $BASH_ENV
+            echo "export WINPYTHON=\"wine64-stable winpython/python.exe\"" >> $BASH_ENV
       - install-python-windows-deps
+      - run:
+          name: Build bcryptprimitives.dll shim
+          command: |
+            rustc tools/patches/bcryptprimitives.rs -Copt-level=3 -Clto=fat --out-dir wine_shims --target x86_64-pc-windows-gnu
+            # This preloads our bcryptprimitives shim.
+            shimpath='Z:\\\\home\\\\circleci\\\\project\\\\wine_shims\\\\bcryptprimitives.dll'
+            echo "import ctypes; ctypes.cdll.LoadLibrary('$shimpath')" >> winpython/sitecustomize.py
       - run:
           name: Run tests
           command: |
@@ -806,20 +822,30 @@ jobs:
             echo "export WINPYTHON=\"wine winpython/python.exe\"" >> $BASH_ENV
       - install-python-windows-deps
       - run:
+          name: Build bcryptprimitives.dll shim
+          command: |
+            rustc tools/patches/bcryptprimitives.rs -Copt-level=3 -Clto=fat --out-dir wine_shims --target i686-pc-windows-gnu
+            # This preloads our bcryptprimitives shim.
+            shimpath='Z:\\\\home\\\\circleci\\\\project\\\\wine_shims\\\\bcryptprimitives.dll'
+            echo "import ctypes; ctypes.cdll.LoadLibrary('$shimpath')" >> winpython/sitecustomize.py
+      - run:
           name: Run tests
           command: |
             $WINPYTHON -m pytest -s glean-core/python/tests
 
   Generate Python documentation:
     docker:
-      - image: cimg/python:3.8
+      - image: cimg/python:3.10
     steps:
+      - install-rustup
+      - setup-rust-toolchain
       - checkout
       - attach_workspace:
-          at: glean-core/python/
+          at: .
       - run:
           name: Generate Python docs
-          command: glean-core/python/.venv3.8/bin/python3 -m pdoc --html glean --force -o build/docs/python
+          command: |
+            make docs-python
       - persist_to_workspace:
           root: build/
           paths: docs/python
@@ -836,11 +862,19 @@ jobs:
           command: |
             echo 'export PATH=/opt/python/cp38-cp38/bin:$PATH' >> $BASH_ENV
       - run:
-          name: Build Python extension
+          name: Setup Python env
           command: |
-            make python-setup
-            glean-core/python/.venv3.8/bin/python3 setup.py sdist
-            glean-core/python/.venv3.8/bin/python3 -m twine upload dist/*
+            make setup-python
+      - run:
+          name: Build Python source distribution
+          command: |
+            make build-python-sdist
+      - run:
+          name: Upload Linux source distribution
+          command: |
+            # Requires that the TWINE_USERNAME and TWINE_PASSWORD environment
+            # variables are configured in CircleCI's environment variables.
+            .venv3.8/bin/python3 -m twine upload target/wheels/*
 
   pypi-linux-release:
     docker:
@@ -859,91 +893,63 @@ jobs:
           command: |
             echo 'export PATH=/opt/python/cp38-cp38/bin:$PATH' >> $BASH_ENV
       - run:
-          name: Build Python extension
+          name: Setup Python env
           command: |
-            make build-python
-          environment:
-            GLEAN_BUILD_VARIANT: release
+            make setup-python
       - run:
-          name: Build Linux wheel
+          name: Build Python package
           command: |
-            cd glean-core/python
-            .venv3.8/bin/python3 setup.py bdist_wheel
-            .venv3.8/bin/python3 -m auditwheel repair dist/*.whl
+            make build-python-wheel
+      - run:
+          name: Upload Linux wheel
+          command: |
             # Requires that the TWINE_USERNAME and TWINE_PASSWORD environment
             # variables are configured in CircleCI's environment variables.
-            .venv3.8/bin/python3 -m twine upload wheelhouse/*
-          environment:
-            GLEAN_BUILD_VARIANT: release
+            .venv3.8/bin/python3 -m twine upload target/wheels/*
       - install-ghr-linux
       - run:
           name: Publish to Github
           command: |
             # Upload to GitHub
-            ./ghr -replace ${CIRCLE_TAG} glean-core/python/wheelhouse
+            ./ghr -replace ${CIRCLE_TAG} target/wheels
 
   pypi-macos-release:
     macos:
-      xcode: "13.4.1"
-    steps:
-      - install-rustup
-      - setup-rust-toolchain
-      - checkout
-      - run:
-          name: Build and Test Python extension
-          command: |
-            make test-python
-          environment:
-            # setup.py would set it automatically, but we're building separately.
-            MACOSX_DEPLOYMENT_TARGET: 10.7
-            GLEAN_BUILD_VARIANT: release
-      - run:
-          name: Build macOS wheel
-          command: |
-            cd glean-core/python
-            .venv3.9/bin/python3 setup.py bdist_wheel
-            # Requires that the TWINE_USERNAME and TWINE_PASSWORD environment
-            # variables are configured in CircleCI's environment variables.
-            .venv3.9/bin/python3 -m twine upload dist/*
-          environment:
-            GLEAN_BUILD_VARIANT: release
-      - install-ghr-darwin
-      - run:
-          name: Publish to Github
-          command: |
-            # Upload to GitHub
-            ./ghr -replace ${CIRCLE_TAG} glean-core/python/dist
-
-  pypi-macos-arm64-release:
-    macos:
-      xcode: "13.4.1"
+      xcode: "15.1"
+    resource_class: "macos.m1.medium.gen1"
     steps:
       - install-rustup
       - setup-rust-toolchain
       - checkout
       - run:
           name: Install Python development tools for host
-          command:
-            make python-setup
-      - run:
-          name: Build macOS wheel
           command: |
-            rustup target add aarch64-apple-darwin
-            cd glean-core/python
-            .venv3.9/bin/python3 setup.py bdist_wheel
+            rustup target add x86_64-apple-darwin
+            make setup-python
+      - run:
+          name: Build macOS x86_64 wheel
+          command: |
+            make build-python-wheel GLEAN_BUILD_TARGET=x86_64-apple-darwin
+      - run:
+          name: Build macOS aarch64 wheel
+          command: |
+            make build-python-wheel GLEAN_BUILD_TARGET=aarch64-apple-darwin
+      - run:
+          name: Build macOS universal2 wheel
+          command: |
+            make build-python-wheel GLEAN_BUILD_TARGET="universal2-apple-darwin"
+      - run:
+          name: Upload wheels to PyPI
+          command: |
             # Requires that the TWINE_USERNAME and TWINE_PASSWORD environment
             # variables are configured in CircleCI's environment variables.
-            .venv3.9/bin/python3 -m twine upload dist/*
-          environment:
-            SDKROOT: /Library/Developer/CommandLineTools/SDKs/MacOSX11.sdk
-            GLEAN_BUILD_TARGET: aarch64-apple-darwin
-            GLEAN_BUILD_VARIANT: release
+            .venv3.11/bin/python3 -m twine upload target/wheels/*
       - install-ghr-darwin
       - run:
           name: Publish to Github
           command: |
             # Upload to GitHub
-            ./ghr -replace ${CIRCLE_TAG} glean-core/python/dist
+            ./ghr -replace ${CIRCLE_TAG} target/wheels
 
   pypi-windows-x86_64-release:
     docker:
@@ -954,16 +960,15 @@ jobs:
       - run:
           name: Upload to PyPI
           command: |
-            cd glean-core/python
             # Requires that the TWINE_USERNAME and TWINE_PASSWORD environment
             # variables are configured in CircleCI's environment variables.
-            .venv3.8/bin/python3 -m twine upload dist/*
+            .venv3.8/bin/python3 -m twine upload target/wheels/*
       - install-ghr-linux
       - run:
           name: Publish to Github
           command: |
             # Upload to GitHub
-            ./ghr -replace ${CIRCLE_TAG} glean-core/python/dist
+            ./ghr -replace ${CIRCLE_TAG} target/wheels
 
   pypi-windows-i686-release:
     docker:
@@ -974,34 +979,33 @@ jobs:
       - run:
           name: Upload to PyPI
           command: |
-            cd glean-core/python
             # Requires that the TWINE_USERNAME and TWINE_PASSWORD environment
             # variables are configured in CircleCI's environment variables.
-            .venv3.8/bin/python3 -m twine upload dist/*
+            .venv3.8/bin/python3 -m twine upload target/wheels/*
       - install-ghr-linux
       - run:
           name: Publish to Github
           command: |
             # Upload to GitHub
-            ./ghr -replace ${CIRCLE_TAG} glean-core/python/dist
+            ./ghr -replace ${CIRCLE_TAG} target/wheels
 
   ###########################################################################
   # Docs
 
   Docs internal metrics check:
     docker:
-      - image: cimg/python:3.8
+      - image: cimg/python:3.10
     steps:
       - checkout
       - run:
           name: Internal metrics docs consistency check
           command: |
-            make metrics-docs
+            make docs-metrics
             if ! git diff --exit-code HEAD -- docs/user/collected-metrics/metrics.md; then
               echo "=================================================="
               echo "metrics.md is different from what's stored in git."
               echo "Please regenerate the file using:"
-              echo "    make metrics-docs"
+              echo "    make docs-metrics"
               echo "Commit the modified file and push."
               echo "=================================================="
               exit 1
@@ -1009,12 +1013,12 @@ jobs:
 
   docs-linkcheck:
     docker:
-      - image: cimg/node:17.9
+      - image: cimg/node:22.6
     steps:
       - checkout
       - run:
           name: Install linkchecker
-          command: npm install -g link-checker
+          command: npm install link-checker
       - attach_workspace:
           at: build/
       - run:
@@ -1040,7 +1044,7 @@ jobs:
   # via https://circleci.com/blog/deploying-documentation-to-github-pages-with-continuous-integration/
   docs-deploy:
     docker:
-      - image: node:8.10.0
+      - image: cimg/node:22.6
     steps:
       - checkout
       - attach_workspace:
@@ -1055,7 +1059,7 @@ jobs:
       # see https://circleci.com/docs/2.0/gh-bb-integration/#deployment-keys-and-user-keys
       - add_ssh_keys:
           fingerprints:
-            - "84:e6:13:7e:94:8d:e2:bf:4f:93:1f:d9:52:80:bb:2c"
+            - "52:a9:c6:64:9e:df:60:70:73:da:81:02:71:9e:00:1b"
       # The gh-pages npm package can be used to push a directory to a git branch;
       # see https://www.npmjs.com/package/gh-pages
       - run:
@@ -1063,8 +1067,8 @@ jobs:
           command: |
             git config user.email "jrediger@mozilla.com"
             git config user.name "CircleCI docs-deploy job"
-            npm install -g --silent gh-pages@2.0.1
-            gh-pages --dotfiles --message "[skip ci] Updates" --dist build/docs
+            npm install gh-pages@6.1.1
+            npx gh-pages --dotfiles --message "[skip ci] Updates" --dist build/docs
 
 ###########################################################################
 # Workflows
@@ -1073,21 +1077,33 @@ workflows:
   version: 2
   lint:
     jobs:
-      - Lint YAML with yamllint
-      - License check
-      - Lint Rust with clippy
-      - Docs internal metrics check
-      - Lint Android with ktlint and detekt
-      - Lint Python
-      - Check vendored schema
-      - Check Rust formatting
-      - Check Swift formatting
+      - Lint YAML with yamllint:
+          filters: *ci-filters
+      - License check:
+          filters: *ci-filters
+      - Lint Rust with clippy:
+          filters: *ci-filters
+      - Docs internal metrics check:
+          filters: *ci-filters
+      - Lint Android with ktlint and detekt:
+          filters: *ci-filters
+      - Lint Python:
+          filters: *ci-filters
+      - Check vendored schema:
+          filters: *ci-filters
+      - Check Rust formatting:
+          filters: *ci-filters
+      - Check Swift formatting:
+          filters: *ci-filters
 
   ci:
     jobs:
-      - Rust tests - stable
-      - Rust tests - minimum version
-      - Android tests
+      - Rust tests - stable:
+          filters: *ci-filters
+      - Rust tests - minimum version:
+          filters: *ci-filters
+      - Android tests:
+          filters: *ci-filters
       # iOS jobs run only on main by default, see below for manual-approved jobs
       - iOS build and test:
           filters:
@@ -1097,28 +1113,38 @@ workflows:
           filters:
             branches:
               only: main
-      - Python 3_6 tests
-      - Python 3_6 tests minimum dependencies
-      - Python 3_7 tests
-      - Python 3_8 tests
-      - Python 3_9 tests
-      - Python 3_9 tests minimum dependencies
-      - Python 3_9 on Alpine tests
-      - Python 3_10 tests
-      - Python Windows x86_64 tests
-      - Python Windows i686 tests
+      - Python 3_8 tests:
+          filters: *ci-filters
+      - Python 3_9 tests:
+          filters: *ci-filters
+      - Python 3_9 on Alpine tests:
+          filters: *ci-filters
+      - Python 3_10 tests:
+          filters: *ci-filters
+      - Python 3_11 tests:
+          filters: *ci-filters
+      - Python 3_12 tests:
+          filters: *ci-filters
+      - Python Windows x86_64 tests:
+          filters: *ci-filters
+      - Python Windows i686 tests:
+          filters: *ci-filters
 
       - Generate Rust documentation:
           requires:
             - docs-spellcheck
+          filters: *ci-filters
       - Generate Python documentation:
           requires:
-            - Python 3_8 tests
+            - Python 3_10 tests
+          filters: *ci-filters
       - docs-linkcheck:
           requires:
             - Generate Rust documentation
             - Generate Python documentation
-      - docs-spellcheck
+          filters: *ci-filters
+      - docs-spellcheck:
+          filters: *ci-filters
       - docs-deploy:
           requires:
             - docs-linkcheck
@@ -1134,19 +1160,25 @@ workflows:
           type: approval
           filters:
             branches:
-              ignore: main
+              ignore:
+                - main
+                - release
       - iOS build and test:
           requires:
             - hold
           filters:
             branches:
-              ignore: main
+              ignore:
+                - main
+                - release
       - iOS integration test:
           requires:
             - hold
           filters:
             branches:
-              ignore: main
+              ignore:
+                - main
+                - release
 
   release:
     jobs:
@@ -1161,10 +1193,6 @@ workflows:
             - Python 3_8 tests
           filters: *release-filters
       - pypi-macos-release:
-          requires:
-            - Python 3_8 tests
-          filters: *release-filters
-      - pypi-macos-arm64-release:
           requires:
             - Python 3_8 tests
           filters: *release-filters

@@ -16,20 +16,21 @@ GLEAN_ROOT=$2
 # buildvariant from our xcconfigs
 BUILDVARIANT=$3
 
+if [[ -n "${DEVELOPER_SDK_DIR:-}" ]]; then
+#  # Assume we're in Xcode, which means we're probably cross-compiling.
+#  # In this case, we need to add an extra library search path for build scripts and proc-macros,
+#  # which run on the host instead of the target.
+#  # (macOS Big Sur does not have linkable libraries in /usr/lib/.)
+  libpath="${DEVELOPER_SDK_DIR}/MacOSX.sdk/usr/lib"
+  export LIBRARY_PATH="${libpath}:${LIBRARY_PATH:-}"
+fi
+
 RELFLAG=
 if [[ "$BUILDVARIANT" != "debug" ]]; then
     RELFLAG=--release
 fi
 
 set -euvx
-
-if [[ -n "${SDK_DIR:-}" ]]; then
-  # Assume we're in Xcode, which means we're probably cross-compiling.
-  # In this case, we need to add an extra library search path for build scripts and proc-macros,
-  # which run on the host instead of the target.
-  # (macOS Big Sur does not have linkable libraries in /usr/lib/.)
-  export LIBRARY_PATH="${SDK_DIR}/usr/lib:${LIBRARY_PATH:-}"
-fi
 
 IS_SIMULATOR=0
 if [ "${LLVM_TARGET_TRIPLE_SUFFIX-}" = "-simulator" ]; then
@@ -54,7 +55,7 @@ for arch in $ARCHS; do
         # Hardware iOS targets
         $HOME/.cargo/bin/cargo rustc -p $FFI_TARGET --lib --crate-type staticlib $RELFLAG --target aarch64-apple-ios
       else
-        # M1 iOS simulator -- currently in Nightly only and requires to build `libstd`
+        # M1 iOS simulator
         $HOME/.cargo/bin/cargo rustc -p $FFI_TARGET --lib --crate-type staticlib $RELFLAG --target aarch64-apple-ios-sim
       fi
   esac

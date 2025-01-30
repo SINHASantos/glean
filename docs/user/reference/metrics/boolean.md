@@ -74,7 +74,7 @@ flags.a11yEnabled.set(this.isAccessibilityEnabled());
 **C++**
 
 ```cpp
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/AccessibleMetrics.h"
 
 mozilla::glean::flags::a11y_enabled.Set(false);
 ```
@@ -100,6 +100,8 @@ Glean.flags.a11yEnabled.set(false);
 Gets the recorded value for a given boolean metric.  
 Returns `true` or `false` if data is stored.  
 Returns a language-specific empty/null value if no data is stored.
+Has an optional argument to specify the name of the ping you wish to retrieve data from, except
+in Rust where it's required. `None` or no argument will default to the first value found for `send_in_pings`.
 
 {{#include ../../../shared/tab_header.md}}
 
@@ -167,7 +169,7 @@ assert(await flags.a11yEnabled.testGetValue());
 **C++**
 
 ```cpp
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/AccessibleMetrics.h"
 
 ASSERT_EQ(false, mozilla::glean::flags::a11y_enabled.TestGetValue().value());
 ```
@@ -285,6 +287,5 @@ N/A
 ## Reference
 
 * [Swift API docs](../../../swift/Classes/BooleanMetricType.html)
-* [Python API docs](../../../python/glean/metrics/boolean.html)
+* [Python API docs](../../../python/glean/metrics/index.html#glean.metrics.BooleanMetric)
 * [Rust API docs](../../../docs/glean/private/boolean/struct.BooleanMetric.html)
-* [JavaScript API docs](https://mozilla.github.io/glean.js/classes/core_metrics_types_boolean.default.html)

@@ -5,8 +5,6 @@
 @testable import Glean
 import XCTest
 
-// swiftlint:disable force_cast
-// REASON: Used in a test
 class DeletionRequestPingTests: XCTestCase {
     var expectation: XCTestExpectation?
     var lastPingJson: [String: Any]?
@@ -96,7 +94,7 @@ class DeletionRequestPingTests: XCTestCase {
         setupHttpResponseStub("deletion-request")
         expectation = expectation(description: "Completed upload")
 
-        Glean.shared.setUploadEnabled(false)
+        Glean.shared.setCollectionEnabled(false)
 
         waitForExpectations(timeout: 5.0) { error in
             XCTAssertNil(error, "Test timed out waiting for upload: \(error!)")
@@ -148,5 +146,25 @@ class DeletionRequestPingTests: XCTestCase {
         let clientInfo = lastPingJson!["client_info"] as! [String: Any]
         let clientId = clientInfo["client_id"] as! String
         XCTAssertEqual(clientId, "test-only")
+    }
+
+    func testDeletionRequestPingsContainExperimentationId() {
+        let config = Configuration(experimentationId: "alpha-beta-gamma-delta")
+
+        Glean.shared.resetGlean(configuration: config, clearStores: true)
+
+        setupHttpResponseStub("deletion-request")
+        expectation = expectation(description: "Completed upload")
+
+        Glean.shared.setCollectionEnabled(false)
+
+        waitForExpectations(timeout: 5.0) { error in
+            XCTAssertNil(error, "Test timed out waiting for upload: \(error!)")
+        }
+
+        let metrics = lastPingJson!["metrics"] as! [String: Any]
+        let strings = metrics["string"] as! [String: Any]
+        let experimentationId = strings["glean.client.annotation.experimentation_id"] as! String
+        XCTAssertEqual(experimentationId, "alpha-beta-gamma-delta")
     }
 }

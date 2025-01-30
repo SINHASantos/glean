@@ -6,6 +6,7 @@ import Glean
 import UIKit
 
 typealias BrowserEngagement = GleanMetrics.BrowserEngagement
+typealias Party = GleanMetrics.Party
 
 class ViewController: UIViewController {
     let telemetryPrefKey = "GleanUploadEnabled"
@@ -56,6 +57,19 @@ class ViewController: UIViewController {
         // Increment the custom counter that goes into the sample ping
         Custom.counter.add()
 
+        // Record an object
+        var balloons: Party.BalloonsObject = []
+        var labels: Party.BalloonsObjectItemLabels = []
+        labels.append("round")
+        balloons.append(Party.BalloonsObjectItem(colour: "red", diameter: 5, labels: labels))
+        balloons.append(Party.BalloonsObjectItem(colour: "green"))
+        Party.balloons.set(balloons)
+
+        var animals: Party.AnimalsObject = []
+        animals.append("Dog")
+        animals.append("Cat")
+        Party.animals.set(animals)
+
         // This is referencing the event ping named 'click' from the metrics.yaml file. In
         // order to illustrate adding extra information to the event, it is also adding to the
         // 'extras' field a dictionary of values.  Note that the dictionary keys must be
@@ -73,7 +87,7 @@ class ViewController: UIViewController {
     }
 
     @IBAction func enableToggled(_: Any) {
-        Glean.shared.setUploadEnabled(enableSwitch.isOn)
+        Glean.shared.setCollectionEnabled(enableSwitch.isOn)
         UserDefaults.standard.set(enableSwitch.isOn, forKey: telemetryPrefKey)
         enabledLabel.text = "Glean is \(enableSwitch.isOn ? "enabled" : "disabled")"
     }

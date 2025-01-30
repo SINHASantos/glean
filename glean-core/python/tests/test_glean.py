@@ -4,7 +4,6 @@
 
 
 import io
-import os
 import json
 from pathlib import Path
 import re
@@ -25,6 +24,7 @@ from glean import _builtins
 from glean import _util
 from glean.metrics import (
     CounterMetricType,
+    EventMetricType,
     CommonMetricData,
     Lifetime,
     PingType,
@@ -35,9 +35,22 @@ from glean.testing import _RecordingUploader
 from glean._uniffi import glean_set_test_mode
 
 GLEAN_APP_ID = "glean-python-test"
-
-
 ROOT = Path(__file__).parent
+
+
+def wait_for_requests(server, n=1, timeout=2):
+    """
+    Wait for `n` requests to be received by the server.
+
+    Raises a `TimeoutError` if the file doesn't exist within the timeout.
+    """
+    start_time = time.time()
+    while len(server.requests) < n:
+        time.sleep(0.1)
+        if time.time() - start_time > timeout:
+            raise TimeoutError(
+                f"Expected {n} requests within {timeout} seconds. Got {len(server.requests)}"
+            )
 
 
 def test_setting_upload_enabled_before_initialization_should_not_crash():
@@ -139,6 +152,17 @@ def test_experiments_recording_before_glean_inits():
     assert not Glean.test_is_experiment_active("experiment_preinit_disabled")
 
 
+def test_exeperimentation_id_recording():
+    Glean._reset()
+    Glean._initialize_with_tempdir_for_testing(
+        application_id=GLEAN_APP_ID,
+        application_version=glean_version,
+        upload_enabled=True,
+        configuration=Configuration(experimentation_id="alpha-beta-gamma-delta"),
+    )
+    assert "alpha-beta-gamma-delta" == Glean.test_get_experimentation_id()
+
+
 @pytest.mark.skip
 def test_sending_of_background_pings():
     pass
@@ -226,7 +250,13 @@ def test_dont_schedule_pings_if_metrics_disabled(safe_httpserver):
     )
 
     custom_ping = PingType(
-        name="store1", include_client_id=True, send_if_empty=False, reason_codes=[]
+        name="store1",
+        include_client_id=True,
+        send_if_empty=False,
+        precise_timestamps=True,
+        include_info_sections=True,
+        schedules_pings=[],
+        reason_codes=[],
     )
 
     counter_metric.add(10)
@@ -242,7 +272,13 @@ def test_dont_schedule_pings_if_there_is_no_ping_content(safe_httpserver):
     safe_httpserver.serve_content(b"", code=200)
 
     custom_ping = PingType(
-        name="store1", include_client_id=True, send_if_empty=False, reason_codes=[]
+        name="store1",
+        include_client_id=True,
+        send_if_empty=False,
+        precise_timestamps=True,
+        include_info_sections=True,
+        schedules_pings=[],
+        reason_codes=[],
     )
 
     custom_ping.submit()
@@ -259,8 +295,7 @@ def test_the_app_channel_must_be_correctly_set():
         configuration=Configuration(channel="my-test-channel"),
     )
     assert (
-        "my-test-channel"
-        == _builtins.metrics.glean.internal.metrics.app_channel.test_get_value()
+        "my-test-channel" == _builtins.metrics.glean.internal.metrics.app_channel.test_get_value()
     )
 
 
@@ -298,13 +333,17 @@ def test_ping_collection_must_happen_after_currently_scheduled_metrics_recording
 
     info_path = Path(str(tmpdir)) / "info.txt"
 
-    monkeypatch.setattr(
-        Glean._configuration, "ping_uploader", _RecordingUploader(info_path)
-    )
+    monkeypatch.setattr(Glean._configuration, "ping_uploader", _RecordingUploader(info_path))
 
     ping_name = "custom_ping_1"
     ping = PingType(
-        name=ping_name, include_client_id=True, send_if_empty=False, reason_codes=[]
+        name=ping_name,
+        include_client_id=True,
+        send_if_empty=False,
+        precise_timestamps=True,
+        include_info_sections=True,
+        schedules_pings=[],
+        reason_codes=[],
     )
     string_metric = StringMetricType(
         CommonMetricData(
@@ -428,17 +467,7 @@ def test_set_application_build_id():
         upload_enabled=True,
     )
 
-    assert (
-        "123ABC" == _builtins.metrics.glean.internal.metrics.app_build.test_get_value()
-    )
-
-
-def wait_for_requests(server, n=1, timeout=2):
-    start_time = time.time()
-    while len(server.requests) < n:
-        time.sleep(0.1)
-        if time.time() - start_time > timeout:
-            raise TimeoutError()
+    assert "123ABC" == _builtins.metrics.glean.internal.metrics.app_build.test_get_value()
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="bug 1771157: Windows failures")
@@ -578,6 +607,52 @@ def test_no_sending_deletion_ping_if_unchanged_outside_of_run(safe_httpserver, t
     assert 0 == len(safe_httpserver.requests)
 
 
+def test_deletion_request_ping_contains_experimentation_id(tmpdir, ping_schema_url):
+    info_path = Path(str(tmpdir)) / "info.txt"
+    data_dir = Path(str(tmpdir)) / "glean"
+
+    Glean._reset()
+
+    Glean.initialize(
+        application_id=GLEAN_APP_ID,
+        application_version=glean_version,
+        upload_enabled=True,
+        data_dir=data_dir,
+        configuration=Configuration(
+            ping_uploader=_RecordingUploader(info_path),
+            experimentation_id="alpha-beta-gamma-delta",
+        ),
+    )
+
+    Glean._reset()
+
+    Glean.initialize(
+        application_id=GLEAN_APP_ID,
+        application_version=glean_version,
+        upload_enabled=False,
+        data_dir=data_dir,
+        configuration=Configuration(
+            ping_uploader=_RecordingUploader(info_path),
+            experimentation_id="alpha-beta-gamma-delta",
+        ),
+    )
+
+    while not info_path.exists():
+        time.sleep(0.1)
+
+    with info_path.open("r") as fd:
+        url_path = fd.readline()
+        serialized_ping = fd.readline()
+
+    assert "deletion-request" == url_path.split("/")[3]
+
+    json_content = json.loads(serialized_ping)
+
+    assert {"glean.client.annotation.experimentation_id": "alpha-beta-gamma-delta"} == json_content[
+        "metrics"
+    ]["string"]
+
+
 def test_dont_allow_multiprocessing(monkeypatch, safe_httpserver):
     safe_httpserver.serve_content(b"", code=200)
 
@@ -591,7 +666,13 @@ def test_dont_allow_multiprocessing(monkeypatch, safe_httpserver):
     monkeypatch.setattr(subprocess, "Popen", broken_process)
 
     custom_ping = PingType(
-        name="store1", include_client_id=True, send_if_empty=True, reason_codes=[]
+        name="store1",
+        include_client_id=True,
+        send_if_empty=True,
+        precise_timestamps=True,
+        include_info_sections=True,
+        schedules_pings=[],
+        reason_codes=[],
     )
 
     custom_ping.submit()
@@ -659,7 +740,13 @@ def test_presubmit_makes_a_valid_ping(tmpdir, ping_schema_url, monkeypatch):
 
     ping_name = "preinit_ping"
     ping = PingType(
-        name=ping_name, include_client_id=True, send_if_empty=True, reason_codes=[]
+        name=ping_name,
+        include_client_id=True,
+        send_if_empty=True,
+        precise_timestamps=True,
+        include_info_sections=True,
+        schedules_pings=[],
+        reason_codes=[],
     )
 
     # Submit a ping prior to calling initialize
@@ -671,9 +758,7 @@ def test_presubmit_makes_a_valid_ping(tmpdir, ping_schema_url, monkeypatch):
         configuration=Glean._configuration,
     )
 
-    monkeypatch.setattr(
-        Glean._configuration, "ping_uploader", _RecordingUploader(info_path)
-    )
+    monkeypatch.setattr(Glean._configuration, "ping_uploader", _RecordingUploader(info_path))
 
     while not info_path.exists():
         time.sleep(0.1)
@@ -702,13 +787,12 @@ def test_app_display_version_unknown():
     )
 
     assert (
-        "Unknown"
-        == _builtins.metrics.glean.internal.metrics.app_display_version.test_get_value()
+        "Unknown" == _builtins.metrics.glean.internal.metrics.app_display_version.test_get_value()
     )
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="bug 1771157: Windows failures")
-def test_flipping_upload_enabled_respects_order_of_events(tmpdir, monkeypatch):
+def test_flipping_upload_enabled_respects_order_of_events(tmpdir, monkeypatch, helpers):
     # This test relies on testing mode to be disabled, since we need to prove the
     # real-world async behaviour of this.
     Glean._reset()
@@ -720,6 +804,9 @@ def test_flipping_upload_enabled_respects_order_of_events(tmpdir, monkeypatch):
         name="sample_ping_1",
         include_client_id=True,
         send_if_empty=True,
+        precise_timestamps=True,
+        include_info_sections=True,
+        schedules_pings=[],
         reason_codes=[],
     )
 
@@ -737,7 +824,7 @@ def test_flipping_upload_enabled_respects_order_of_events(tmpdir, monkeypatch):
     # Submit a custom ping.
     ping.submit()
 
-    url_path, payload = wait_for_ping(info_path, max_wait=20)
+    url_path, payload = helpers.wait_for_ping(info_path)
 
     # Validate we got the deletion-request ping
     assert "deletion-request" == url_path.split("/")[3]
@@ -755,27 +842,8 @@ def test_data_dir_is_required():
         )
 
 
-def wait_for_ping(info_path, max_wait=10) -> (str, str):
-    while not info_path.exists():
-        time.sleep(0.1)
-        max_wait -= 1
-        if max_wait == 0:
-            break
-
-    if not info_path.exists():
-        raise RuntimeError("No ping received.")
-
-    with info_path.open("r") as fd:
-        url_path = fd.readline()
-        serialized_ping = fd.readline()
-        payload = json.loads(serialized_ping)
-
-    os.remove(info_path)
-    return (url_path, payload)
-
-
 @pytest.mark.skipif(sys.platform == "win32", reason="bug 1771157: Windows failures")
-def test_client_activity_api(tmpdir, monkeypatch):
+def test_client_activity_api(tmpdir, monkeypatch, helpers):
     Glean._reset()
 
     info_path = Path(str(tmpdir)) / "info.txt"
@@ -798,7 +866,7 @@ def test_client_activity_api(tmpdir, monkeypatch):
     # Making it active
     Glean.handle_client_active()
 
-    url_path, payload = wait_for_ping(info_path, max_wait=20)
+    url_path, payload = helpers.wait_for_ping(info_path)
     assert "baseline" == url_path.split("/")[3]
     assert payload["ping_info"]["reason"] == "active"
     # It's an empty ping.
@@ -810,7 +878,7 @@ def test_client_activity_api(tmpdir, monkeypatch):
     # Making it inactive
     Glean.handle_client_inactive()
 
-    url_path, payload = wait_for_ping(info_path, max_wait=20)
+    url_path, payload = helpers.wait_for_ping(info_path)
     assert "baseline" == url_path.split("/")[3]
     assert payload["ping_info"]["reason"] == "inactive"
     assert "glean.baseline.duration" in payload["metrics"]["timespan"]
@@ -821,7 +889,7 @@ def test_client_activity_api(tmpdir, monkeypatch):
     # Once more active
     Glean.handle_client_active()
 
-    url_path, payload = wait_for_ping(info_path, max_wait=20)
+    url_path, payload = helpers.wait_for_ping(info_path)
     assert "baseline" == url_path.split("/")[3]
     assert payload["ping_info"]["reason"] == "active"
     assert "timespan" not in payload["metrics"]
@@ -843,7 +911,13 @@ def test_sending_of_custom_pings(safe_httpserver):
     )
 
     custom_ping = PingType(
-        name="store1", include_client_id=True, send_if_empty=False, reason_codes=[]
+        name="store1",
+        include_client_id=True,
+        send_if_empty=False,
+        precise_timestamps=True,
+        include_info_sections=True,
+        schedules_pings=[],
+        reason_codes=[],
     )
 
     counter_metric.add()
@@ -862,3 +936,95 @@ def test_sending_of_custom_pings(safe_httpserver):
     assert callback_was_called[0]
 
     assert 1 == len(safe_httpserver.requests)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="uploader isn't started fast enough")
+def test_max_events_overflow(tmpdir, helpers):
+    info_path = Path(str(tmpdir)) / "info.txt"
+    data_dir = Path(str(tmpdir)) / "glean"
+
+    Glean._reset()
+    Glean.initialize(
+        application_id=GLEAN_APP_ID,
+        application_version=glean_version,
+        upload_enabled=True,
+        data_dir=data_dir,
+        configuration=Configuration(
+            max_events=1,
+            ping_uploader=_RecordingUploader(info_path),
+        ),
+    )
+
+    event = EventMetricType(
+        CommonMetricData(
+            disabled=False,
+            category="testing",
+            lifetime=Lifetime.APPLICATION,
+            name="event",
+            send_in_pings=["events"],
+            dynamic_label=None,
+        ),
+        allowed_extra_keys=[],
+    )
+
+    # Records the event and triggers the ping due to max_events=1
+    event.record()
+
+    url_path, payload = helpers.wait_for_ping(info_path)
+
+    assert "events" == url_path.split("/")[3]
+    events = payload["events"]
+    reason = payload["ping_info"]["reason"]
+
+    assert "max_capacity" == reason
+    assert 1 == len(events)
+    assert "testing" == events[0]["category"]
+    assert "event" == events[0]["name"]
+    assert 0 == events[0]["timestamp"]
+
+
+def test_glean_shutdown(safe_httpserver):
+    """
+    In theory we want to test that `Glean.shutdown` here waits for Glean
+    and any uploader to shut down.
+    In practice because the process dispatcher runs using multiprocessing
+    this test will succeed regardless of the `Glean.shutdown` call.
+    """
+
+    Glean._reset()
+
+    custom_ping = PingType(
+        name="custom",
+        include_client_id=True,
+        send_if_empty=False,
+        precise_timestamps=False,
+        include_info_sections=True,
+        schedules_pings=[],
+        reason_codes=[],
+    )
+
+    counter = CounterMetricType(
+        CommonMetricData(
+            category="telemetry",
+            name="counter_metric",
+            send_in_pings=["custom"],
+            lifetime=Lifetime.APPLICATION,
+            disabled=False,
+            dynamic_label=None,
+        )
+    )
+
+    Glean._initialize_with_tempdir_for_testing(
+        application_id=GLEAN_APP_ID,
+        application_version=glean_version,
+        upload_enabled=True,
+        configuration=Configuration(server_endpoint=safe_httpserver.url),
+    )
+
+    for _ in range(10):
+        counter.add(1)
+        custom_ping.submit()
+
+    Glean.shutdown()
+    wait_for_requests(safe_httpserver, n=10)
+    assert 10 == len(safe_httpserver.requests)

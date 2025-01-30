@@ -167,6 +167,8 @@ tasks:
                                         then:
                                             - index.project.${project}.v2.branch.${short_head_branch}.latest.taskgraph.decision
                                             - index.project.${project}.v2.branch.${short_head_branch}.revision.${head_sha}.taskgraph.decision
+                                            # needed by `add-new-jobs` action
+                                            - index.${trustDomain}.v2.${project}.revision.${head_sha}.taskgraph.decision
                                       - $if: 'tasks_for == "cron"'
                                         then:
                                             # cron context provides ${head_branch} as a short one
@@ -185,7 +187,7 @@ tasks:
                                 else:
                                     $if: 'tasks_for == "github-release"'
                                     then:
-                                        - 'assume:repo:${repoUrl[8:]}:release'
+                                        - 'assume:repo:${repoUrl[8:]}:release:${releaseAction}'
                                     else:
                                         $if: 'tasks_for == "action"'
                                         then:
@@ -207,7 +209,6 @@ tasks:
                                       GLEAN_HEAD_REF: '${head_branch}'
                                       GLEAN_HEAD_REV: '${head_sha}'
                                       GLEAN_HEAD_TAG: '${head_tag}'
-                                      GLEAN_PIP_REQUIREMENTS: taskcluster/requirements.txt
                                       GLEAN_REPOSITORY_TYPE: git
                                       REPOSITORIES: {$json: {glean: "Glean"}}
                                       ANDROID_SDK_ROOT: /builds/worker/android-sdk
@@ -221,14 +222,15 @@ tasks:
                                           ACTION_TASK_ID: {$json: {$eval: 'taskId'}}  # taskId of the target task (JSON-encoded)
                                           ACTION_INPUT: {$json: {$eval: 'input'}}
                                           ACTION_CALLBACK: '${action.cb_name}'
-
+                            cache:
+                                "${trustDomain}-project-${project}-level-${level}-checkouts-sparse-v1": /builds/worker/checkouts
                             features:
                                 taskclusterProxy: true
                                 chainOfTrust: true
                             # Note: This task is built server side without the context or tooling that
                             # exist in tree so we must hard code the hash
                             image:
-                                mozillareleases/taskgraph:decision-mobile-7e11b0cc3966ad9729e08b19551399b3343d3b385eac067b6335d4c34431a899@sha256:b309fa59efd59991ba286a326cb43b724c38e6f3872c52d0f85e96428899c2fc
+                                mozillareleases/taskgraph:decision-v8.1.0@sha256:ffed8883c6f3e505dd88bafd7a153103b768c77609bf0cbafd15dd602ba95352
 
                             maxRunTime: 1800
 
@@ -246,10 +248,10 @@ tasks:
                                       then: >
                                           cd /builds/worker/checkouts/vcs &&
                                           ln -s /builds/worker/artifacts artifacts &&
-                                          ~/.local/bin/taskgraph action-callback
+                                          taskgraph action-callback
                                       else: >
                                           ln -s /builds/worker/artifacts artifacts &&
-                                          ~/.local/bin/taskgraph decision
+                                          taskgraph decision
                                           --pushlog-id='0'
                                           --pushdate='0'
                                           --project='${project}'

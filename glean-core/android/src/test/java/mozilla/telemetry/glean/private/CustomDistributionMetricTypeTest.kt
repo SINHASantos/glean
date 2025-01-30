@@ -36,7 +36,7 @@ class CustomDistributionMetricTypeTest {
             rangeMin = 0L,
             rangeMax = 60000L,
             bucketCount = 100,
-            histogramType = HistogramType.EXPONENTIAL
+            histogramType = HistogramType.EXPONENTIAL,
         )
 
         // Accumulate a few values
@@ -71,7 +71,7 @@ class CustomDistributionMetricTypeTest {
             rangeMin = 0L,
             rangeMax = 60000L,
             bucketCount = 100,
-            histogramType = HistogramType.EXPONENTIAL
+            histogramType = HistogramType.EXPONENTIAL,
         )
 
         // Attempt to store to the distribution
@@ -80,7 +80,7 @@ class CustomDistributionMetricTypeTest {
         // Check that nothing was recorded.
         assertNull(
             "Disabled CustomDistributions should not record data.",
-            metric.testGetValue()
+            metric.testGetValue(),
         )
     }
 
@@ -98,7 +98,7 @@ class CustomDistributionMetricTypeTest {
             rangeMin = 0L,
             rangeMax = 60000L,
             bucketCount = 100,
-            histogramType = HistogramType.EXPONENTIAL
+            histogramType = HistogramType.EXPONENTIAL,
         )
         assertNull(metric.testGetValue())
     }
@@ -117,7 +117,7 @@ class CustomDistributionMetricTypeTest {
             rangeMin = 0L,
             rangeMax = 60000L,
             bucketCount = 100,
-            histogramType = HistogramType.EXPONENTIAL
+            histogramType = HistogramType.EXPONENTIAL,
         )
 
         // Accumulate a few values
@@ -147,7 +147,7 @@ class CustomDistributionMetricTypeTest {
     }
 
     @Test
-    fun `The accumulateSamples API correctly stores values`() {
+    fun `The accumulateSample APIs correctly store values`() {
         // Define a custom distribution metric which will be stored in multiple stores
         val metric = CustomDistributionMetricType(
             CommonMetricData(
@@ -160,7 +160,7 @@ class CustomDistributionMetricTypeTest {
             rangeMin = 0L,
             rangeMax = 60000L,
             bucketCount = 100,
-            histogramType = HistogramType.EXPONENTIAL
+            histogramType = HistogramType.EXPONENTIAL,
         )
 
         // Accumulate a few values
@@ -177,6 +177,13 @@ class CustomDistributionMetricTypeTest {
         assertEquals(1L, snapshot.values[2])
         // Check that the 3L fell into the third bucket
         assertEquals(1L, snapshot.values[3])
+
+        // Check that the single sample API records correctly.
+        metric.accumulateSingleSample(4L)
+
+        val snapshotTwo = metric.testGetValue("store1")!!
+        assertEquals(10L, snapshotTwo.sum)
+        assertEquals(4L, snapshotTwo.count)
     }
 
     @Test
@@ -193,7 +200,7 @@ class CustomDistributionMetricTypeTest {
             rangeMin = 0L,
             rangeMax = 60000L,
             bucketCount = 100,
-            histogramType = HistogramType.EXPONENTIAL
+            histogramType = HistogramType.EXPONENTIAL,
         )
 
         // Accumulate a few values

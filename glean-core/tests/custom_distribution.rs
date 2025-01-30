@@ -40,7 +40,7 @@ mod linear {
                 HistogramType::Linear,
             );
 
-            metric.accumulate_samples_sync(&glean, vec![50]);
+            metric.accumulate_samples_sync(&glean, &[50]);
 
             let snapshot = metric
                 .get_value(&glean, "store1")
@@ -52,7 +52,7 @@ mod linear {
         // Make a new Glean instance here, which should force reloading of the data from disk
         // so we can ensure it persisted, because it has User lifetime
         {
-            let (glean, _) = new_glean(Some(tempdir));
+            let (glean, _t) = new_glean(Some(tempdir));
             let snapshot = StorageManager
                 .snapshot_as_json(glean.storage(), "store1", true)
                 .unwrap();
@@ -84,7 +84,7 @@ mod linear {
             HistogramType::Linear,
         );
 
-        metric.accumulate_samples_sync(&glean, vec![50]);
+        metric.accumulate_samples_sync(&glean, &[50]);
 
         for store_name in store_names {
             let snapshot = StorageManager
@@ -126,7 +126,7 @@ mod linear {
 
         // Accumulate the samples. We intentionally do not report
         // negative values to not trigger error reporting.
-        metric.accumulate_samples_sync(&glean, [1, 2, 3].to_vec());
+        metric.accumulate_samples_sync(&glean, &[1, 2, 3]);
 
         let snapshot = metric
             .get_value(&glean, "store1")
@@ -168,7 +168,7 @@ mod linear {
         );
 
         // Accumulate the samples.
-        metric.accumulate_samples_sync(&glean, [-1, 1, 2, 3].to_vec());
+        metric.accumulate_samples_sync(&glean, &[-1, 1, 2, 3]);
 
         let snapshot = metric
             .get_value(&glean, "store1")
@@ -209,7 +209,7 @@ mod linear {
             HistogramType::Linear,
         );
 
-        metric.accumulate_samples_sync(&glean, vec![50]);
+        metric.accumulate_samples_sync(&glean, &[50]);
 
         let snapshot = metric.get_value(&glean, "store1");
         assert!(snapshot.is_some());
@@ -242,7 +242,7 @@ mod exponential {
                 HistogramType::Exponential,
             );
 
-            metric.accumulate_samples_sync(&glean, vec![50]);
+            metric.accumulate_samples_sync(&glean, &[50]);
 
             let snapshot = metric
                 .get_value(&glean, "store1")
@@ -254,7 +254,7 @@ mod exponential {
         // Make a new Glean instance here, which should force reloading of the data from disk
         // so we can ensure it persisted, because it has User lifetime
         {
-            let (glean, _) = new_glean(Some(tempdir));
+            let (glean, _t) = new_glean(Some(tempdir));
             let snapshot = StorageManager
                 .snapshot_as_json(glean.storage(), "store1", true)
                 .unwrap();
@@ -286,7 +286,7 @@ mod exponential {
             HistogramType::Exponential,
         );
 
-        metric.accumulate_samples_sync(&glean, vec![50]);
+        metric.accumulate_samples_sync(&glean, &[50]);
 
         for store_name in store_names {
             let snapshot = StorageManager
@@ -328,7 +328,7 @@ mod exponential {
 
         // Accumulate the samples. We intentionally do not report
         // negative values to not trigger error reporting.
-        metric.accumulate_samples_sync(&glean, [1, 2, 3].to_vec());
+        metric.accumulate_samples_sync(&glean, &[1, 2, 3]);
 
         let snapshot = metric
             .get_value(&glean, "store1")
@@ -370,7 +370,7 @@ mod exponential {
         );
 
         // Accumulate the samples.
-        metric.accumulate_samples_sync(&glean, [-1, 1, 2, 3].to_vec());
+        metric.accumulate_samples_sync(&glean, &[-1, 1, 2, 3]);
 
         let snapshot = metric
             .get_value(&glean, "store1")
@@ -411,7 +411,7 @@ mod exponential {
             HistogramType::Exponential,
         );
 
-        metric.accumulate_samples_sync(&glean, vec![50]);
+        metric.accumulate_samples_sync(&glean, &[50]);
 
         let snapshot = metric.get_value(&glean, "store1");
         assert!(snapshot.is_some());

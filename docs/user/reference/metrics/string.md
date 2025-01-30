@@ -99,7 +99,7 @@ searchDefault.name.set("wikipedia");
 **C++**
 
 ```c++
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/SearchMetrics.h"
 
 mozilla::glean::search_default::name.Set("wikipedia"_ns);
 ```
@@ -114,14 +114,15 @@ Glean.searchDefault.name.set("wikipedia");
 
 {{#include ../../../shared/tab_footer.md}}
 
-#### Limits
-
-* Fixed maximum string length: 100. Longer strings are truncated. This is measured in the number of bytes when the string is encoded in UTF-8.
-
 #### Recorded errors
 
 * [`invalid_overflow`](../../user/metrics/error-reporting.md): if the string is too long. (Prior to Glean 31.5.0, this recorded an `invalid_value`).
 * [`invalid_type`](../../user/metrics/error-reporting.md): if a non-string value is given.
+
+#### Limits
+
+* Fixed maximum string length: 255. Longer strings are truncated. This is measured in the number of bytes when the string is encoded in UTF-8.
+  * Prior to Glean v60.4.0 the limit was 100 bytes.
 
 ## Testing API
 
@@ -130,6 +131,8 @@ Glean.searchDefault.name.set("wikipedia");
 Get the recorded value for a given string metric.  
 Returns the string if data is stored.  
 Returns a language-specific empty/null value if no data is stored.
+Has an optional argument to specify the name of the ping you wish to retrieve data from, except
+in Rust where it's required. `None` or no argument will default to the first value found for `send_in_pings`.
 
 The recorded value may have been truncated. See ["Limits"](#limits) section above.
 
@@ -203,7 +206,7 @@ assert.strictEqual("wikipedia", await searchDefault.name.testGetValue());
 **C++**
 
 ```c++
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/SearchMetrics.h"
 
 // Is it clear of errors?
 ASSERT_TRUE(mozilla::glean::search_default::name.TestGetValue().isOk());
@@ -354,4 +357,3 @@ N/A
 * [Swift API docs](../../../swift/Classes/StringMetricType.html)
 * [Python API docs](../../../python/glean/metrics/string.html)
 * [Rust API docs](../../../docs/glean/private/struct.StringMetric.html)
-* [JavaScript API docs](https://mozilla.github.io/glean.js/classes/core_metrics_types_string.default.html#set)

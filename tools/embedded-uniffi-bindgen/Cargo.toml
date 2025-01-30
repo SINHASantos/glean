@@ -1,11 +1,16 @@
 [package]
-name = "embedded-uniffi-bindgen"
+name = "uniffi-bindgen"
 version = "0.1.0"
-authors = ["The Firefox Sync Developers <sync-team@mozilla.com>"]
 edition = "2021"
 license = "MPL-2.0"
 publish = false
 
 [dependencies]
 anyhow = "1"
-uniffi_bindgen = "0.21.0"
+camino = "1.1.1"
+uniffi = { version = "0.28.0", default-features = false, features = ["bindgen"] }
+
+[lib]
+test = false
+doctest = false
+doc = false

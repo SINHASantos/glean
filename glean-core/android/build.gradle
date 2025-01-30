@@ -8,12 +8,13 @@
 import groovy.json.JsonOutput
 
 plugins {
-    id "com.jetbrains.python.envs" version "0.0.26"
+    alias libs.plugins.gradle.python.envs
 }
 
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 apply plugin: 'jacoco'
+apply plugin: 'kotlinx-serialization'
 
 /*
  * This defines the location of the JSON schema used to validate the pings
@@ -29,6 +30,7 @@ ext.gleanNamespace = "mozilla.telemetry.glean"
 
 android {
     compileSdkVersion rootProject.ext.build.compileSdkVersion
+    namespace "mozilla.telemetry.glean"
 
     defaultConfig {
         minSdkVersion rootProject.ext.build['minSdkVersion']
@@ -58,6 +60,10 @@ android {
         }
     }
 
+    buildFeatures {
+        buildConfig true
+    }
+
     sourceSets {
         test.resources.srcDirs += "$buildDir/rustJniLibs/desktop"
         // Add glean-native's build directory to our resource path so that
@@ -66,21 +72,14 @@ android {
         test.resources.srcDirs += "${project(':glean-native').buildDir}/rustJniLibs/desktop"
     }
 
-    // Uncomment to include debug symbols in native library builds.
-    // packagingOptions { doNotStrip "**/*.so" }
-
-    // This is required to support new AndroidX support libraries.
-    // See mozilla-mobile/android-components#842
-    compileOptions {
-        sourceCompatibility 1.8
-        targetCompatibility 1.8
-    }
-
-    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
-        kotlinOptions {
-            jvmTarget = "1.8"
+    publishing {
+        singleVariant('release') {
+            withSourcesJar()
         }
     }
+
+    // Uncomment to include debug symbols in native library builds.
+    // packagingOptions { doNotStrip "**/*.so" }
 
     testOptions {
         unitTests.all {
@@ -98,35 +97,37 @@ android {
 }
 
 afterEvaluate {
-    jacoco {
-      toolVersion = "0.8.7"
-    }
-
-    task jacocoTestReport(type: JacocoReport) {
-        reports {
-            xml.enabled = true
-            html.enabled = true
+    if (project.hasProperty("coverage")) {
+        jacoco {
+          toolVersion = libs.versions.jacoco
         }
 
-        def fileFilter = ['**/R.class', '**/R$*.class', '**/BuildConfig.*', '**/Manifest*.*',
-                          '**/*Test*.*', 'android/**/*.*', '**/*$[0-9].*']
-        def kotlinDebugTree = fileTree(dir: "$project.buildDir/tmp/kotlin-classes/debug", excludes: fileFilter)
-        def javaDebugTree = fileTree(dir: "$project.buildDir/intermediates/classes/debug", excludes: fileFilter)
-        def mainSrc = "$project.projectDir/src/main/java"
+        task jacocoTestReport(type: JacocoReport) {
+            reports {
+                xml.required = true
+                html.required = true
+            }
 
-        sourceDirectories.from = files([mainSrc])
-        classDirectories.from = files([kotlinDebugTree, javaDebugTree])
-        executionData.from = fileTree(dir: project.buildDir, includes: [
-                'jacoco/testDebugUnitTest.exec', 'outputs/code-coverage/connected/*coverage.ec'
-        ])
-    }
+            def fileFilter = ['**/R.class', '**/R$*.class', '**/BuildConfig.*', '**/Manifest*.*',
+                              '**/*Test*.*', 'android/**/*.*', '**/*$[0-9].*']
+            def kotlinDebugTree = fileTree(dir: "$project.buildDir/tmp/kotlin-classes/debug", excludes: fileFilter)
+            def javaDebugTree = fileTree(dir: "$project.buildDir/intermediates/classes/debug", excludes: fileFilter)
+            def mainSrc = "$project.projectDir/src/main/java"
 
-    tasks.withType(Test) {
-      jacoco.includeNoLocationClasses = true
-      // See https://github.com/gradle/gradle/issues/5184#issuecomment-457865951
-      jacoco.excludes = ['jdk.internal.*']
+            sourceDirectories.from = files([mainSrc])
+            classDirectories.from = files([kotlinDebugTree, javaDebugTree])
+            executionData.from = fileTree(dir: project.buildDir, includes: [
+                    'jacoco/testDebugUnitTest.exec', 'outputs/code-coverage/connected/*coverage.ec'
+            ])
+        }
 
-      finalizedBy jacocoTestReport
+        tasks.withType(Test) {
+          jacoco.includeNoLocationClasses = true
+          // See https://github.com/gradle/gradle/issues/5184#issuecomment-457865951
+          jacoco.excludes = ['jdk.internal.*']
+
+          finalizedBy jacocoTestReport
+        }
     }
 }
 
@@ -148,19 +149,27 @@ configurations {
 }
 
 dependencies {
-    jnaForTest "net.java.dev.jna:jna:$versions.jna@jar"
-    implementation "net.java.dev.jna:jna:$versions.jna@aar"
+    jnaForTest(libs.jna) {
+        artifact {
+            extension ="jar"
+            type = "jar"
+        }
+    }
+    implementation(libs.jna) {
+        artifact {
+            extension ="aar"
+            type = "aar"
+        }
+    }
 
     implementation project(":glean-native")
 
-    // Note: the following version must be kept in sync
-    implementation "org.jetbrains.kotlin:kotlin-stdlib:$versions.kotlin"
-    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:$versions.coroutines"
-
-    implementation "androidx.annotation:annotation:$versions.androidx_annotation"
-    implementation "androidx.lifecycle:lifecycle-common:$versions.androidx_lifecycle"
-    implementation "androidx.lifecycle:lifecycle-process:$versions.androidx_lifecycle"
-    implementation "androidx.work:work-runtime-ktx:$versions.androidx_work"
+    implementation libs.androidx.annotation
+    implementation libs.androidx.lifecycle.common
+    implementation libs.androidx.lifecycle.process
+    implementation libs.androidx.work
+    implementation libs.kotlinx.coroutines
+    api libs.kotlinx.serialization
 
     // We need a compileOnly dependency on the following block of testing
     // libraries in order to expose the GleanTestRule to applications/libraries
@@ -168,8 +177,8 @@ dependencies {
     // We can't simply create a separate package otherwise we would need
     // to provide a public API for the testing package to access the
     // Glean internals, which is something we would not want to do.
-    compileOnly "junit:junit:$versions.junit"
-    compileOnly "androidx.work:work-testing:$versions.androidx_work"
+    compileOnly libs.junit
+    compileOnly libs.test.work
 
     // For reasons unknown, resolving the jnaForTest configuration directly
     // trips a nasty issue with the Android-Gradle plugin 3.2.1, like `Cannot
@@ -179,15 +188,15 @@ dependencies {
     // causing it to be resolved.  Cloning first dissociates the configuration,
     // avoiding other configurations from being resolved.  Tricky!
     testImplementation files(configurations.jnaForTest.copyRecursive().files)
-    testImplementation "androidx.test.ext:junit:$versions.androidx_junit"
-    testImplementation "org.robolectric:robolectric:$versions.robolectric"
-    testImplementation "org.mockito:mockito-core:$versions.mockito"
-    testImplementation "androidx.test:core-ktx:$versions.androidx_test"
-    testImplementation "com.squareup.okhttp3:mockwebserver:$versions.mockwebserver"
-    testImplementation "androidx.work:work-testing:$versions.androidx_work"
+    testImplementation libs.mockito
+    testImplementation libs.mockwebserver
+    testImplementation libs.robolectric
+    testImplementation libs.test.core
+    testImplementation libs.test.junit.ext
+    testImplementation libs.test.work
 
-    androidTestImplementation "androidx.test:runner:$versions.androidx_test"
-    androidTestImplementation "androidx.test.espresso:espresso-core:$versions.androidx_espresso"
+    androidTestImplementation libs.test.espresso.core
+    androidTestImplementation libs.test.runner
 }
 
 evaluationDependsOn(":glean-native")

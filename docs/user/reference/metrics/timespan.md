@@ -85,7 +85,7 @@ function onShowLogin() {
 
 **C++**
 ```c++
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/PasswordmgrMetrics.h"
 void OnShowLogin() {
   mozilla::glean::auth::login_time.Start();
   // ...
@@ -199,7 +199,7 @@ function onLogin() {
 
 **C++**
 ```c++
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/PasswordmgrMetrics.h"
 void OnLogin() {
   mozilla::glean::auth::login_time.Stop();
   // ...
@@ -295,7 +295,7 @@ function onLoginCancel() {
 
 **C++**
 ```c++
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/PasswordmgrMetrics.h"
 void OnLoginCancel() {
   mozilla::glean::auth::login_time.Cancel();
   // ...
@@ -455,7 +455,7 @@ function onAfterLogin(loginElapsedNs) {
 
 **C++**
 ```c++
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/PasswordmgrMetrics.h"
 
 void AfterLogin(uint32_t aDuration) {
   mozilla::glean::auth::login_time.SetRaw(aDuration);
@@ -485,6 +485,8 @@ function afterLogin(aDuration) {
 Get the currently-stored value.  
 Returns the timespan as a integer in the metric's time unit if data is stored.  
 Returns a language-specific empty/null value if no data is stored.
+Has an optional argument to specify the name of the ping you wish to retrieve data from, except
+in Rust where it's required. `None` or no argument will default to the first value found for `send_in_pings`.
 
 {{#include ../../../shared/tab_header.md}}
 <div data-lang="Kotlin" class="tab">
@@ -523,7 +525,7 @@ assert metrics.auth.login_time.test_get_value() > 0
 ```Rust
 use glean_metrics::auth;
 
-assert!(auth::login_time.test_get_value().unwrap() > 0);
+assert!(auth::login_time.test_get_value(None).unwrap() > 0);
 ```
 </div>
 <div data-lang="JavaScript" class="tab">
@@ -538,7 +540,7 @@ assert(await auth.loginTime.testGetValue() > 0);
 
 **C++**
 ```c++
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/PasswordmgrMetrics.h"
 
 ASSERT_TRUE(mozilla::glean::auth::login_time.TestGetValue().isOk());
 ASSERT_GE(mozilla::glean::auth::login_time.TestGetValue().unwrap().value(), 0);
@@ -681,6 +683,5 @@ and use the largest possible value that will provide useful information so as to
 ## Reference
 
 * [Swift API docs](../../../swift/Classes/TimespanMetricType.html)
-* [Python API docs](../../../python/glean/metrics/timespan.html)
+* [Python API docs](../../../python/glean/metrics/index.html#glean.metrics.TimespanMetricType)
 * [Rust API docs](../../../docs/glean/private/struct.TimespanMetric.html)
-* [JavaScript API docs](https://mozilla.github.io/glean.js/classes/core_metrics_types_timespan.default.html)

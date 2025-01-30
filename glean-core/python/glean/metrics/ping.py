@@ -15,7 +15,12 @@ class PingType:
         name: str,
         include_client_id: bool,
         send_if_empty: bool,
+        precise_timestamps: bool,
+        include_info_sections: bool,
+        schedules_pings: List[str],
         reason_codes: List[str],
+        enabled: bool = True,
+        follows_collection_enabled: bool = True,
     ):
         """
         This implements the developer facing API for custom pings.
@@ -25,7 +30,15 @@ class PingType:
         """
         self._reason_codes = reason_codes
         self._inner = GleanPingType(
-            name, include_client_id, send_if_empty, reason_codes
+            name,
+            include_client_id,
+            send_if_empty,
+            precise_timestamps,
+            include_info_sections,
+            enabled,
+            schedules_pings,
+            reason_codes,
+            follows_collection_enabled,
         )
         self._test_callback = None  # type: Optional[Callable[[Optional[str]], None]]
 
@@ -62,3 +75,12 @@ class PingType:
             self._test_callback = None
 
         self._inner.submit(reason_string)
+
+    def set_enabled(self, enabled: bool) -> None:
+        """
+        Enable or disable a ping.
+
+        Disabling a ping causes all data for that ping to be removed from storage
+        and all pending pings of that type to be deleted.
+        """
+        self._inner.set_enabled(enabled)

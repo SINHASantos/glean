@@ -35,8 +35,8 @@ class CounterMetricTypeTest {
                 category = "telemetry",
                 lifetime = Lifetime.APPLICATION,
                 name = "counter_metric",
-                sendInPings = listOf("store1")
-            )
+                sendInPings = listOf("store1"),
+            ),
         )
 
         assertNull(counterMetric.testGetValue())
@@ -64,8 +64,8 @@ class CounterMetricTypeTest {
                 category = "telemetry",
                 lifetime = Lifetime.APPLICATION,
                 name = "counter_metric",
-                sendInPings = listOf("store1")
-            )
+                sendInPings = listOf("store1"),
+            ),
         )
 
         // Attempt to store the counter.
@@ -73,12 +73,11 @@ class CounterMetricTypeTest {
         // Check that nothing was recorded.
         assertNull(
             "Counters must not be recorded if they are disabled",
-            counterMetric.testGetValue()
+            counterMetric.testGetValue(),
         )
     }
 
-    // TODO: Fixme: should we continue throwing an exception instead?
-    @Test // (expected = NullPointerException::class)
+    @Test
     fun `testGetValue() returns null if nothing is stored`() {
         val counterMetric = CounterMetricType(
             CommonMetricData(
@@ -86,8 +85,8 @@ class CounterMetricTypeTest {
                 category = "telemetry",
                 lifetime = Lifetime.APPLICATION,
                 name = "counter_metric",
-                sendInPings = listOf("store1")
-            )
+                sendInPings = listOf("store1"),
+            ),
         )
         assertNull(counterMetric.testGetValue())
     }
@@ -101,8 +100,8 @@ class CounterMetricTypeTest {
                 category = "telemetry",
                 lifetime = Lifetime.APPLICATION,
                 name = "counter_metric",
-                sendInPings = listOf("store1", "store2")
-            )
+                sendInPings = listOf("store1", "store2"),
+            ),
         )
 
         // Add to the counter a couple of times with a little delay.  The first call will check
@@ -127,8 +126,8 @@ class CounterMetricTypeTest {
                 category = "telemetry",
                 lifetime = Lifetime.APPLICATION,
                 name = "counter_metric",
-                sendInPings = listOf("store1")
-            )
+                sendInPings = listOf("store1"),
+            ),
         )
 
         // Increment to 1 (initial value)

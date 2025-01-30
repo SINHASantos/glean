@@ -2,6 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+#![allow(clippy::uninlined_format_args)]
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(missing_docs)]
 
@@ -18,20 +19,11 @@
 //! Initialize Glean, register a ping and then send it.
 //!
 //! ```rust,no_run
-//! # use glean::{Configuration, ClientInfoMetrics, Error, private::*};
-//! let cfg = Configuration {
-//!     data_path: "/tmp/data".into(),
-//!     application_id: "org.mozilla.glean_core.example".into(),
-//!     upload_enabled: true,
-//!     max_events: None,
-//!     delay_ping_lifetime_io: false,
-//!     server_endpoint: None,
-//!     uploader: None,
-//!     use_core_mps: false,
-//! };
+//! # use glean::{ConfigurationBuilder, ClientInfoMetrics, Error, private::*};
+//! let cfg = ConfigurationBuilder::new(true, "/tmp/data", "org.mozilla.glean_core.example").build();
 //! glean::initialize(cfg, ClientInfoMetrics::unknown());
 //!
-//! let prototype_ping = PingType::new("prototype", true, true, vec!());
+//! let prototype_ping = PingType::new("prototype", true, true, true, true, true, vec!(), vec!(), true);
 //!
 //! prototype_ping.submit(None);
 //! ```
@@ -39,13 +31,16 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-pub use configuration::Configuration;
 use configuration::DEFAULT_GLEAN_ENDPOINT;
+pub use configuration::{Builder as ConfigurationBuilder, Configuration};
 pub use core_metrics::ClientInfoMetrics;
 pub use glean_core::{
-    metrics::{Datetime, DistributionData, MemoryUnit, Rate, RecordedEvent, TimeUnit, TimerId},
-    traits, CommonMetricData, Error, ErrorType, Glean, HistogramType, Lifetime, RecordedExperiment,
-    Result,
+    metrics::{
+        Datetime, DistributionData, MemoryUnit, MetricIdentifier, Rate, RecordedEvent, TimeUnit,
+        TimerId,
+    },
+    traits, CommonMetricData, Error, ErrorType, Glean, HistogramType, LabeledMetricData, Lifetime,
+    PingRateLimit, RecordedExperiment, Result,
 };
 
 mod configuration;
@@ -78,7 +73,7 @@ struct GleanEvents {
 }
 
 impl glean_core::OnGleanEvents for GleanEvents {
-    fn on_initialize_finished(&self) {
+    fn initialize_finished(&self) {
         // intentionally left empty
     }
 
@@ -95,6 +90,11 @@ impl glean_core::OnGleanEvents for GleanEvents {
 
     fn cancel_uploads(&self) -> Result<(), glean_core::CallbackError> {
         // intentionally left empty
+        Ok(())
+    }
+
+    fn shutdown(&self) -> Result<(), glean_core::CallbackError> {
+        self.upload_manager.shutdown();
         Ok(())
     }
 }
@@ -120,6 +120,15 @@ fn initialize_internal(cfg: Configuration, client_info: ClientInfoMetrics) -> Op
         delay_ping_lifetime_io: cfg.delay_ping_lifetime_io,
         app_build: client_info.app_build.clone(),
         use_core_mps: cfg.use_core_mps,
+        trim_data_to_registered_pings: cfg.trim_data_to_registered_pings,
+        log_level: cfg.log_level,
+        rate_limit: cfg.rate_limit,
+        enable_event_timestamps: cfg.enable_event_timestamps,
+        experimentation_id: cfg.experimentation_id,
+        enable_internal_pings: cfg.enable_internal_pings,
+        ping_schedule: cfg.ping_schedule,
+        ping_lifetime_threshold: cfg.ping_lifetime_threshold as u64,
+        ping_lifetime_max_time: cfg.ping_lifetime_max_time.as_millis() as u64,
     };
 
     glean_core::glean_initialize(core_cfg, client_info.into(), callbacks);
@@ -131,11 +140,21 @@ pub fn shutdown() {
     glean_core::shutdown()
 }
 
-/// Sets whether upload is enabled or not.
+/// **DEPRECATED** Sets whether upload is enabled or not.
+///
+/// **DEPRECATION NOTICE**:
+/// This API is deprecated. Use `set_collection_enabled` instead.
 ///
 /// See [`glean_core::Glean::set_upload_enabled`].
 pub fn set_upload_enabled(enabled: bool) {
     glean_core::glean_set_upload_enabled(enabled)
+}
+
+/// Sets whether upload is enabled or not.
+///
+/// See [`glean_core::Glean::set_upload_enabled`].
+pub fn set_collection_enabled(enabled: bool) {
+    glean_core::glean_set_collection_enabled(enabled)
 }
 
 /// Collects and submits a ping for eventual uploading by name.
@@ -170,11 +189,23 @@ pub fn set_experiment_inactive(experiment_id: String) {
     glean_core::glean_set_experiment_inactive(experiment_id)
 }
 
+/// Dynamically set the experimentation identifier, as opposed to setting it through the configuration
+/// during initialization.
+pub fn set_experimentation_id(experimentation_id: String) {
+    glean_core::glean_set_experimentation_id(experimentation_id);
+}
+
+/// TEST ONLY FUNCTION.
+/// Gets stored experimentation id.
+pub fn test_get_experimentation_id() -> Option<String> {
+    glean_core::glean_test_get_experimentation_id()
+}
+
 /// Set the remote configuration values for the metrics' disabled property
 ///
-/// See [`glean_core::Glean::set_metrics_disabled_config`].
-pub fn glean_set_metrics_disabled_config(json: String) {
-    glean_core::glean_set_metrics_disabled_config(json)
+/// See [`glean_core::Glean::glean_apply_server_knobs_config`].
+pub fn glean_apply_server_knobs_config(json: String) {
+    glean_core::glean_apply_server_knobs_config(json)
 }
 
 /// Performs the collection/cleanup operations required by becoming active.
@@ -241,6 +272,21 @@ pub fn set_debug_view_tag(tag: &str) -> bool {
     glean_core::glean_set_debug_view_tag(tag.to_string())
 }
 
+/// Gets the currently set debug view tag.
+///
+/// The `debug_view_tag` may be set from an environment variable
+/// (`GLEAN_DEBUG_VIEW_TAG`) or through the [`set_debug_view_tag`] function.
+///
+/// **WARNING** This function will block if Glean hasn't been initialized and
+/// should only be used for debug purposes.
+///
+/// # Returns
+///
+/// Return the value for the debug view tag or [`None`] if it hasn't been set.
+pub fn glean_get_debug_view_tag() -> Option<String> {
+    glean_core::glean_get_debug_view_tag()
+}
+
 /// Sets the log pings debug option.
 ///
 /// When the log pings debug option is `true`,
@@ -251,6 +297,21 @@ pub fn set_debug_view_tag(tag: &str) -> bool {
 /// * `value` - The value of the log pings option
 pub fn set_log_pings(value: bool) {
     glean_core::glean_set_log_pings(value)
+}
+
+/// Gets the current log pings value.
+///
+/// The `log_pings` option may be set from an environment variable (`GLEAN_LOG_PINGS`)
+/// or through the [`set_log_pings`] function.
+///
+/// **WARNING** This function will block if Glean hasn't been initialized and
+/// should only be used for debug purposes.
+///
+/// # Returns
+///
+/// Return the value for the log pings debug option.
+pub fn glean_get_log_pings() -> bool {
+    glean_core::glean_get_log_pings()
 }
 
 /// Sets source tags.
@@ -273,12 +334,26 @@ pub fn get_timestamp_ms() -> u64 {
     glean_core::get_timestamp_ms()
 }
 
-/// Asks the database to persist ping-lifetime data to disk. Probably expensive to call.
+/// Asks the database to persist ping-lifetime data to disk.
+///
+/// Probably expensive to call.
 /// Only has effect when Glean is configured with `delay_ping_lifetime_io: true`.
 /// If Glean hasn't been initialized this will dispatch and return Ok(()),
 /// otherwise it will block until the persist is done and return its Result.
 pub fn persist_ping_lifetime_data() {
-    glean_core::persist_ping_lifetime_data();
+    glean_core::glean_persist_ping_lifetime_data();
+}
+
+/// Gets a list of currently registered ping names.
+///
+/// **WARNING** This function will block if Glean hasn't been initialized and
+/// should only be used for debug purposes.
+///
+/// # Returns
+///
+/// The list of ping names that are currently registered.
+pub fn get_registered_ping_names() -> Vec<String> {
+    glean_core::glean_get_registered_ping_names()
 }
 
 #[cfg(test)]

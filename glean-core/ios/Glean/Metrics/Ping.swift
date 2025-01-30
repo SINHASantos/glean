@@ -35,14 +35,29 @@ public class Ping<ReasonCodesEnum: ReasonCodes> {
     var testCallback: ((ReasonCodesEnum?) throws -> Void)?
 
     /// The public constructor used by automatically generated metrics.
-    public init(name: String, includeClientId: Bool, sendIfEmpty: Bool, reasonCodes: [String]) {
+    public init(
+        name: String,
+        includeClientId: Bool,
+        sendIfEmpty: Bool,
+        preciseTimestamps: Bool,
+        includeInfoSections: Bool,
+        enabled: Bool,
+        schedulesPings: [String],
+        reasonCodes: [String],
+        followsCollectionEnabled: Bool
+    ) {
         self.name = name
         self.reasonCodes = reasonCodes
         self.innerPing = PingType(
             name,
             includeClientId,
             sendIfEmpty,
-            reasonCodes
+            preciseTimestamps,
+            includeInfoSections,
+            enabled,
+            schedulesPings,
+            reasonCodes,
+            followsCollectionEnabled
         )
     }
 
@@ -83,5 +98,13 @@ public class Ping<ReasonCodesEnum: ReasonCodes> {
             reasonString = self.reasonCodes[reason!.index()]
         }
         innerPing.submit(reasonString)
+    }
+
+    /// Enable or disable a ping.
+    ///
+    /// Disabling a ping causes all data for that ping to be removed from storage
+    /// and all pending pings of that type to be deleted.
+    public func setEnabled(enabled: Bool) {
+        innerPing.setEnabled(enabled)
     }
 }

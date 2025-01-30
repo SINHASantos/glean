@@ -28,6 +28,9 @@ browser.engagement:
       key2:
         type: string
         description: "This is key two"
+      And1WithUnusualCASING:
+        type: boolean
+        description: "This is key three"
     expires: 2
     metadata:
       tags:
@@ -148,6 +151,20 @@ custom:
     notification_emails:
       - CHANGE-ME@test-only.com
     expires: 2
+  bg_counter:
+    type: counter
+    description: |
+      A custom counter incremented in background process
+    lifetime: ping
+    send_in_pings:
+      - background
+    bugs:
+      - https://bugzilla.mozilla.org/1547330
+    data_reviews:
+      - N/A
+    notification_emails:
+      - CHANGE-ME@test-only.com
+    expires: 2
 
 legacy_ids:
   client_id:
@@ -163,3 +180,45 @@ legacy_ids:
     notification_emails:
       - CHANGE-ME@example.com
     expires: 2
+
+party:
+  balloons:
+    type: object
+    description: A collection of balloons
+    bugs:
+      - https://bugzilla.mozilla.org/TODO
+    data_reviews:
+      - http://example.com/reviews
+    notification_emails:
+      - CHANGE-ME@example.com
+    expires: never
+    structure:
+      type: array
+      items:
+        type: object
+        properties:
+          colour:
+            type: string
+          diameter:
+            type: number
+          labels:
+            type: array
+            items:
+              type: string
+  animals:
+    type: object
+    description: >
+      Contains a list of party animals
+    notification_emails:
+      - CHANGE-ME@example.com
+    bugs:
+      - https://bugzilla.mozilla.org/TODO
+    data_reviews:
+      - http://example.com/reviews
+    data_sensitivity:
+      - technical
+    expires: never
+    structure:
+      type: array
+      items:
+        type: string

@@ -16,7 +16,7 @@ from .._uniffi import (
     glean_initialize_for_subprocess,
     glean_process_ping_upload_response,
 )
-from .._uniffi import InternalConfiguration, UploadTaskAction
+from .._uniffi import InternalConfiguration, UploadTaskAction, PingUploadTask
 from .._process_dispatcher import ProcessDispatcher
 
 
@@ -68,17 +68,11 @@ class PingUploadWorker:
 
 # Ping files are UUIDs.  This matches UUIDs for filtering purposes.
 _FILE_PATTERN = re.compile(
-    "[0-9a-fA-F]{8}-"
-    "[0-9a-fA-F]{4}-"
-    "[0-9a-fA-F]{4}-"
-    "[0-9a-fA-F]{4}-"
-    "[0-9a-fA-F]{12}"
+    "[0-9a-fA-F]{8}-" "[0-9a-fA-F]{4}-" "[0-9a-fA-F]{4}-" "[0-9a-fA-F]{4}-" "[0-9a-fA-F]{12}"
 )
 
 
-def _parse_ping_headers(
-    headers_as_json: str, document_id: str
-) -> List[Tuple[str, str]]:
+def _parse_ping_headers(headers_as_json: str, document_id: str) -> List[Tuple[str, str]]:
     """
     Parse the headers coming from FFI.
 
@@ -99,7 +93,6 @@ def _parse_ping_headers(
 
 
 def _process(data_dir: Path, application_id: str, configuration) -> bool:
-
     # Import here to avoid cyclical import
     from ..glean import Glean
 
@@ -120,6 +113,15 @@ def _process(data_dir: Path, application_id: str, configuration) -> bool:
             delay_ping_lifetime_io=False,
             use_core_mps=False,
             app_build="",
+            trim_data_to_registered_pings=False,
+            log_level=None,
+            rate_limit=None,
+            enable_event_timestamps=False,
+            experimentation_id=None,
+            enable_internal_pings=False,
+            ping_schedule={},
+            ping_lifetime_threshold=0,
+            ping_lifetime_max_time=0,
         )
         if not glean_initialize_for_subprocess(cfg):
             log.error("Couldn't initialize Glean in subprocess")
@@ -130,7 +132,7 @@ def _process(data_dir: Path, application_id: str, configuration) -> bool:
     while True:
         task = glean_get_upload_task()
 
-        if task.is_upload():
+        if isinstance(task, PingUploadTask.UPLOAD):
             # Ping data is available for upload: parse the structure but make
             # sure to let Rust free the memory.
             request = task.request
@@ -151,7 +153,7 @@ def _process(data_dir: Path, application_id: str, configuration) -> bool:
             else:  # action == UploadTaskAction.END
                 return True
 
-        elif task.is_wait():
+        elif isinstance(task, PingUploadTask.WAIT):
             time.sleep(task.time / 1000)
         elif task.is_done():
             return True

@@ -7,7 +7,6 @@ This module contains a ping uploader based on the Python stdlib's http.client
 module.
 """
 
-
 import http.client
 import logging
 import socket

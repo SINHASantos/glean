@@ -1,6 +1,429 @@
 # Unreleased changes
 
-[Full changelog](https://github.com/mozilla/glean/compare/v51.8.3...main)
+[Full changelog](https://github.com/mozilla/glean/compare/v63.1.0...main)
+
+# v63.1.0 (2025-01-30)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v63.0.0...v63.1.0)
+
+* General
+  * The `glean.validation.pings_submitted` metric will now only record counts for built-in pings ([#3010](https://github.com/mozilla/glean/pull/3010))
+* Rust
+  * Provide a public interface so that consumers of RLB can access metric identifiers ([#3054](https://github.com/mozilla/glean/pull/3054))
+* Kotlin
+  * Updated `rust-android-gradle` to avoid problems with Python 3.13+ ([#3031](https://github.com/mozilla/glean/pull/3031))
+  * Update Glean plugin to be configuration-cache friendly ([#3041](https://github.com/mozilla/glean/pull/3041))
+  * Dispatch experiment API on the task queue ([#3032](https://github.com/mozilla/glean/pull/3032))
+
+# v63.0.0 (2024-11-28)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v62.0.0...v63.0.0)
+
+* General
+  * Add methods to access current Glean debugging settings and the list of currently registered pings([Bug 1921976](https://bugzilla.mozilla.org/show_bug.cgi?id=1921976)).
+  * Require `glean_parser` v16.1.0 ([#3006](https://github.com/mozilla/glean/pull/3006))
+  * BREAKING CHANGE: Add new `collection-enabled` mode (and `follows_collection_enabled` setting for pings).
+    This allows to control a subset of pings independently from the Glean-wide `upload-enabled` flag.
+    This deprecates the `setUploadEnabled` API in favor of `setCollectionEnabled`. ([#3006](https://github.com/mozilla/glean/pull/3006))
+* Rust
+  * Permit Glean shutdown to interrupt UploadManager Wait tasks ([bug 1928288](https://bugzilla.mozilla.org/show_bug.cgi?id=1928288))
+
+# v62.0.0 (2024-11-05)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v61.2.0...v62.0.0)
+
+* General
+  * **BREAKING**: Remove LMDB-to-safe-mode migration.
+    Safe-mode became the default in Glean v51. ([bug 1780370](https://bugzilla.mozilla.org/show_bug.cgi?id=1780370))
+  * **BREAKING**: Stop sending buckets with 0 counts in memory_distribution and timing_distribution metric payloads ([bug 1898336](https://bugzilla.mozilla.org/show_bug.cgi?id=1898336))
+  * Require `glean_parser` v15.2.0 ([bug 1925346](https://bugzilla.mozilla.org/show_bug.cgi?id=1925346))
+  * Disabled the `glean.database.write_time` metric as the instrumented behavior was triggering metrics pings to be sent containing only that metric ([Bug 1928168](https://bugzilla.mozilla.org/show_bug.cgi?id=1928168))
+* Rust
+  * New Metric Type: `labeled_quantity` ([bug 1925346](https://bugzilla.mozilla.org/show_bug.cgi?id=1925346))
+
+# v61.2.0 (2024-10-07)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v61.1.0...v61.2.0)
+
+* Kotlin
+  * Accept a ping schedule map on initialize ([#2967](https://github.com/mozilla/glean/pull/2967))
+* Swift
+  * Accept a ping schedule map on initialize ([#2967](https://github.com/mozilla/glean/pull/2967))
+
+# v61.1.0 (2024-09-24)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v61.0.0...v61.1.0)
+
+* Kotlin
+  * Change Metrics Ping Scheduler to use daemon threads ([#2930](https://github.com/mozilla/glean/pull/2930))
+  * Dispatch metric recording for event, object and timing distribution on the task queue ([#2942](https://github.com/mozilla/glean/pull/2942))
+* Rust
+  * **Experimental**: Buffered API for timing, memory and custom distribution ([#2948](https://github.com/mozilla/glean/pull/2948))
+
+# v61.0.0 (2024-08-21)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v60.5.0...v61.0.0)
+
+* General
+  * BREAKING CHANGE: Updated to UniFFI 0.28.0 ([#2920](https://github.com/mozilla/glean/pull/2920))
+  * BREAKING CHANGE: Update to `glean_parser` v15.0.0 ([release notes](https://github.com/mozilla/glean_parser/releases/tag/v15.0.0))
+* Kotlin
+  * BREAKING CHANGE: Remove now obsolete type alias ([#2935](https://github.com/mozilla/glean/issues/2935))
+
+# v60.5.0 (2024-08-06)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v60.4.0...v60.5.0)
+
+* General
+  * Make auto-flush behavior configurable and time-based ([#2871](https://github.com/mozilla/glean/pull/2871))
+  * Require `glean_parser` v14.5.0 ([#2916](https://github.com/mozilla/glean/pull/2916))
+* Android
+  * Update to Gradle v8.9 ([#2909](https://github.com/mozilla/glean/pull/2909))
+  * Fixed `GleanTestLocalServer` test rule to prevent leaking between tests([Bug 1787234](https://bugzilla.mozilla.org/show_bug.cgi?id=1787234))
+* Rust
+  * Remove cargo feature `preinit_million_queue` and set the default pre-init queue size to 10^6 for all consumers ([Bug 1909246](https://bugzilla.mozilla.org/show_bug.cgi?id=1909246))
+
+# v60.4.0 (2024-07-23)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v60.3.0...v60.4.0)
+
+* General
+  * Bump the string length limit to 255 characters ([#2857](https://github.com/mozilla/glean/pull/2857))
+  * New metric `glean.database.write_time` to measure database writes ([#2845](https://github.com/mozilla/glean/pull/2845))
+  * Require glean_parser v14.3.0 ([bug 1909244](https://bugzilla.mozilla.org/show_bug.cgi?id=1909244))
+* Android
+  * Delay log init until Glean is getting initialized ([#2858](https://github.com/mozilla/glean/pull/2858))
+  * Update to Gradle v8.8 ([#2860](https://github.com/mozilla/glean/pull/2860))
+  * Updated Kotlin to version 1.9.24 ([#2861](https://github.com/mozilla/glean/pull/2861))
+  * Default-enable `delayPingLifetimeIo` ([#2863](https://github.com/mozilla/glean/issues/2863))
+  * Preparing Glean to be able to remove `service-glean` from Android Components ([#2891](https://github.com/mozilla/glean/pull/2891))
+  * Gradle Plugin: Support for using an external Python environment ([#2889](https://github.com/mozilla/glean/pull/2889))
+* Rust
+  * New Metric Types: `labeled_custom_distribution`, `labeled_memory_distribution`, and `labeled_timing_distribution` ([bug 1657947](https://bugzilla.mozilla.org/show_bug.cgi?id=1657947))
+
+# v60.3.0 (2024-05-31)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v60.2.0...v60.3.0)
+
+* Android
+  * Allow configuring `delayPingLifetimeIo` in Kotlin and auto-flush this data after 1000 writes.
+    It is also auto-flushed on background. ([#2851](https://github.com/mozilla/glean/pull/2851))
+
+# v60.2.0 (2024-05-23)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v60.1.0...v60.2.0)
+
+* Rust
+  * Accept a ping schedule map on initialize ([#2839](https://github.com/mozilla/glean/pull/2839))
+
+# v60.1.1 (2024-05-31)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v60.1.0...v60.1.1)
+
+* Android
+  * Allow configuring `delayPingLifetimeIo` in Kotlin and auto-flush this data after 1000 writes.
+    It is also auto-flushed on background. ([#2851](https://github.com/mozilla/glean/pull/2851))
+    (Backported changes)
+
+# v60.1.0 (2024-05-06)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v60.0.0...v60.1.0)
+
+* Rust
+  * New `TimingDistribution` API for no-allocation single-duration accumulation. ([bug 1892097](https://bugzilla.mozilla.org/show_bug.cgi?id=1892097))
+* Python
+  * Replace use of deprecated functionality (and make installs work on Python 3.12) ([#2820](https://github.com/mozilla/glean/pull/2820))
+
+# v60.0.1 (2024-05-31)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v60.0.0...v60.0.1)
+
+* Android
+  * Allow configuring `delayPingLifetimeIo` in Kotlin and auto-flush this data after 1000 writes.
+    It is also auto-flushed on background. ([#2851](https://github.com/mozilla/glean/pull/2851))
+    (Backported changes)
+
+# v60.0.0 (2024-04-22)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v59.0.0...v60.0.0)
+
+* General
+  * BREAKING CHANGE: Server Knobs API changes requiring changes to consuming applications which make use of Server Knobs ([Bug 1889114](https://bugzilla.mozilla.org/show_bug.cgi?id=1889114))
+  * BREAKING CHANGE: Deprecated Server Knobs API `setMetricsDisabled` has been removed from all bindings. ([#2792](https://github.com/mozilla/glean/pull/2792))
+  * Added support for `ping_schedule` metadata property so that pings can be scheduled to be sent when other pings are sent. ([#2791](https://github.com/mozilla/glean/pull/2791))
+* Android
+  * Updated Kotlin to version 1.9.23 ([#2737](https://github.com/mozilla/glean/pull/2737))
+  * New metric type: Object ([#2796](https://github.com/mozilla/glean/pull/2796))
+* iOS
+  * New metric type: Object ([#2796](https://github.com/mozilla/glean/pull/2796))
+* Python
+  * New metric type: Object ([#2796](https://github.com/mozilla/glean/pull/2796))
+
+# v59.0.0 (2024-03-28)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v58.1.0...v59.0.0)
+
+* General
+  * Hide `glean_timestamp` from event extras in tests ([#2776](https://github.com/mozilla/glean/pull/2776))
+  * Timing Distribution's timer ids now begin at 1, rather than 0, to make some multi-language use cases easier. ([2777](https://bugzilla.mozilla.org/show_bug.cgi?id=1882584))
+  * Add a configuration option to disable internal pings ([#2786](https://github.com/mozilla/glean/pull/2786/))
+  * Updated to UniFFI 0.27.0 ([#2762](https://github.com/mozilla/glean/pull/2762))
+
+# v58.1.0 (2024-03-12)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v58.0.0...v58.1.0)
+
+* General
+  * Enable wall clock timestamp on all events by default ([#2767](https://github.com/mozilla/glean/issues/2767))
+* Rust
+  * Timing distribution and Custom distributions now expose `accumulate_single_sample`. This includes their traits and consumers that make use of them will need to implement the new functions ([Bug 1881297](https://bugzilla.mozilla.org/show_bug.cgi?id=1881297))
+* Android
+  * Timing and Custom Distributions now have a `accumulate_single_sample` API that don't require use of a collection ([Bug 1881297](https://bugzilla.mozilla.org/show_bug.cgi?id=1881297))
+* Python
+  * Timing Distributions now have both a `accumulate_samples` and `accumulate_single_sample` ([Bug 1881297](https://bugzilla.mozilla.org/show_bug.cgi?id=1881297))
+
+# v58.0.0 (2024-02-29)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v57.0.0...v58.0.0)
+
+* General
+  * Update `glean_parser` to v13.0.0 ([release notes](https://github.com/mozilla/glean_parser/releases/tag/v13.0.0))
+* Rust
+  * New metric type: Object ([#2489](https://github.com/mozilla/glean/pull/2489))
+  * BREAKING CHANGE: Support pings without `{client|ping}_info` sections ([#2756](https://github.com/mozilla/glean/pull/2756))
+* Android
+  * Upgrade Android NDK to r26c ([#2745](https://github.com/mozilla/glean/pull/2745))
+
+# v57.0.0 (2024-02-12)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v56.1.0...v57.0.0)
+
+* General
+  * Added an experimental event listener API ([#2719](https://github.com/mozilla/glean/pull/2719))
+* Android
+  * BREAKING CHANGE: Update JNA to version 5.14.0. Projects using older JNA releases may encounter errors until they update. ([#2727](https://github.com/mozilla/glean/pull/2727))
+  * Set the target Android SDK to version 34 ([#2709](https://github.com/mozilla/glean/pull/2709))
+  * Fixed an incorrectly named method. The method is now correctly named `setExperimentationId`.
+  * Update to Gradle v8.6 ([#2721](https://github.com/mozilla/glean/pull/2721)/[#2731](https://github.com/mozilla/glean/pull/2731))
+  
+# v56.1.0 (2024-01-16)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v56.0.0...v56.1.0)
+
+* General
+  * Errors are now recorded in cases where we had to create a new data store for Glean due to a failure ([bug 1815253](https://bugzilla.mozilla.org/show_bug.cgi?id=1815253))
+  * Update `glean_parser` to v11.0.0 ([release notes](https://github.com/mozilla/glean_parser/releases/tag/v11.0.0))
+  * Event metrics can now record a maximum of 50 keys in the event extra object ([Bug 1869429](https://bugzilla.mozilla.org/show_bug.cgi?id=1869429))
+* iOS
+  * Glean for iOS is now being built with Xcode 15.1 ([#2669](https://github.com/mozilla/glean/pull/2669))
+* Android
+  * Replaced `whenTaskAdded` with `configureEach` in `GleanGradlePlugin` to avoid unnecessary configuration. ([#2697](https://github.com/mozilla/glean/pull/2697))
+
+# v56.0.0 (2023-11-30)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v55.0.0...v56.0.0)
+
+* General
+  * Updated to UniFFI 0.25.2 ([#2678](https://github.com/mozilla/glean/pull/2678))
+* iOS
+  * Dropped support for iOS < 15 ([#2681](https://github.com/mozilla/glean/pull/2681))
+
+# v55.0.0 (2023-10-23)
+
+* Python
+  * BREAKING CHANGE: Dropped support for Python 3.7 ([#]())
+
+[Full changelog](https://github.com/mozilla/glean/compare/v54.0.0...v55.0.0)
+
+* General
+  * BREAKING CHANGE: Adding `0` to a `counter` or `labeled_counter` metric will be silently ignored instead of raising an `invalid_value` error ([bug 1762859](https://bugzilla.mozilla.org/show_bug.cgi?id=1762859))
+  * Trigger the uploader thread after scanning the pending pings directory ([bug 1847950](https://bugzilla.mozilla.org/show_bug.cgi?id=1847950))
+  * Extend start/stop time of a ping to millisecond precision. Custom pings can opt-out using `precise_timestamps: false` ([#2456](https://github.com/mozilla/glean/pull/2456))
+  * Update `glean_parser` to v10.0.0. Disallow `unit` field for anything but quantity, disallows `ping` lifetime metrics on the events ping, allows to configure precise timestamps in pings ([release notes](https://github.com/mozilla/glean_parser/releases/tag/v10.0.0))
+  * Add an API to set an Experimentation ID that will be annotated to all pings ([Bug 1848201](https://bugzilla.mozilla.org/show_bug.cgi?id=1848201))
+
+# v54.0.0 (2023-09-12)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v53.2.0...v54.0.0)
+
+* General
+  * Experimental: Add configuration to add a wall clock timestamp to all events ([#2513](https://github.com/mozilla/glean/issues/2513))
+* Python
+  * Switched the build system to maturin. This should not have any effect on consumers. ([#2345](https://github.com/mozilla/glean/pull/2345))
+  * BREAKING CHANGE: Dropped support for Python 3.6 ([#2345](https://github.com/mozilla/glean/pull/2345))
+* Kotlin
+  * Update to Gradle v8.2.1 ([#2516](https://github.com/mozilla/glean/pull/2516))
+  * Increase Android compile SDK to version 34 ([#2614](https://github.com/mozilla/glean/pull/2614))
+
+# v53.2.0 (2023-08-02)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v53.1.0...v53.2.0)
+
+* General
+  * Update `glean_parser` to v8.1.0. Subsequently, metric names now have a larger limit of 70 characters ([release notes](https://github.com/mozilla/glean_parser/releases/tag/v8.1.0))
+* Rust
+  * The Ping Rate Limit type is now accessible in the Rust Language Binding ([#2528](https://github.com/mozilla/glean/pull/2528))
+  * Gracefully handle a failure when starting the upload thread. Glean no longer crashes in that case. ([#2545](https://github.com/mozilla/glean/pull/2545))
+  * `locale` now exposed through the RLB so it can be set by consumers ([#2531](https://github.com/mozilla/glean/pull/2531))
+* Python
+  * Added the shutdown API for Python to ensure orderly shutdown and waiting for uploader processes ([#2538](https://github.com/mozilla/glean/pull/2538))
+* Kotlin
+  * Move running of upload task when Glean is running in a background service to use the internal Glean Dispatchers rather than WorkManager. [Bug 1844533](https://bugzilla.mozilla.org/show_bug.cgi?id=1844533)
+
+# v53.1.0 (2023-06-28)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v53.0.0...v53.1.0)
+
+* General
+  * Gracefully handle the waiting thread going away during shutdown ([#2503](https://github.com/mozilla/glean/pull/2503))
+  * Updated to UniFFI 0.24.1 ([#2510](https://github.com/mozilla/glean/pull/2510))
+  * Try blocking shutdown 10s for init to complete ([#2518](https://github.com/mozilla/glean/pull/2518))
+* Android
+  * Update minimum supported Java byte code generation to 17 ([#2498](https://github.com/mozilla/glean/pull/2498/))
+
+# v53.0.0 (2023-06-07)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v52.7.0...v53.0.0)
+
+* General
+  * Adds the capability to merge remote metric configurations, enabling multiple Nimbus Features or components to share this functionality ([Bug 1833381](https://bugzilla.mozilla.org/show_bug.cgi?id=1833381))
+  * StringList metric type limits have been increased. The length of strings allowed has been increased from 50 to 100 to match the String metric type, and the list length has been increased from 20 to 100 ([Bug 1833870](https://bugzilla.mozilla.org/show_bug.cgi?id=1833870))
+  * Make ping rate limiting configurable on Glean init. ([bug 1647630](https://bugzilla.mozilla.org/show_bug.cgi?id=1647630))
+* Rust
+  * Timing distribution traits now expose `accumulate_samples` and `accumulate_raw_samples_nanos`. This is a breaking change for consumers that make use of the trait as they will need to implement the new functions ([Bug 1829745](https://bugzilla.mozilla.org/show_bug.cgi?id=1829745))
+* iOS
+  * Make debugging APIs available on Swift ([#2470](https://github.com/mozilla/glean/pull/2470))
+  * Added a shutdown API for Swift. This should only be necessary for when Glean is running in a process other than the main process (like in the VPN daemon, for instance)([Bug 1832324](https://bugzilla.mozilla.org/show_bug.cgi?id=1832324))
+  * Glean for iOS is now being built with Xcode 14.3 ([#2253](https://github.com/mozilla/glean/pull/2253))
+
+# v52.7.0 (2023-05-10)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v52.6.0...v52.7.0)
+
+* General
+  * Allow user to configure how verbose the internal logging is ([#2459](https://github.com/mozilla/glean/pull/2459))
+  * Added a timeout waiting for the dispatcher at shutdown ([#2461](https://github.com/mozilla/glean/pull/2461))
+  * Added a new Glean metric `glean.validation.shutdown_dispatcher_wait` measuring the wait time at shutdown ([#2461](https://github.com/mozilla/glean/pull/2461))
+* Kotlin
+  * Update Kotlin to version 1.8.21 ([#2462](https://github.com/mozilla/glean/pull/2462))
+  * Make debugging APIs available on Android ([Bug 1830937](https://bugzilla.mozilla.org/show_bug.cgi?id=1830937))
+
+# v52.6.0 (2023-04-20)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v52.5.0...v52.6.0)
+
+* Rust
+  * The Text metric type is now available in the Rust language bindings ([#2451](https://github.com/mozilla/glean/pull/2451))
+
+# v52.5.0 (2023-04-11)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v52.4.3...v52.5.0)
+
+* General
+  * On Rkv detecting a corrupted database delete the old RKV, create a new one and log the error ([#2425](https://github.com/mozilla/glean/pull/2425))
+  * Add the Date header as late as possible before the uploader acts ([#2436](https://github.com/mozilla/glean/pull/2436))
+  * The logic of the Server Knobs API has been flipped. Instead of applying a list of metrics and their _disabled_ state, the API now accepts a list of metrics and their _enabled_ state ([bug 1811253](https://bugzilla.mozilla.org/show_bug.cgi?id=1811253))
+* Kotlin
+  * Adds the ability to record metrics on a non-main process. This is enabled by setting a `dataPath` in the Glean configuration ([bug 1815233](https://bugzilla.mozilla.org/show_bug.cgi?id=1815233))
+* iOS
+  * Adds the ability to record metrics on a non-main process. This is enabled by setting a `dataPath` in the Glean configuration ([bug 1815233](https://bugzilla.mozilla.org/show_bug.cgi?id=1815233))
+
+# v52.4.3 (2023-03-24)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v52.4.2...v52.4.3)
+
+* General
+  * Expose Server Knobs functionality via UniFFI for use on mobile
+* iOS
+  * BUGFIX: Prevent another test-only issue: The storage going away when the uploader reports back its status ([#2430](https://github.com/mozilla/glean/pull/2430))
+
+# v52.4.2 (2023-03-15)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v52.4.1...v52.4.2)
+
+* Rust
+  * Revert to libstd's `remove_dir_all` instead of external crate ([#2415](https://github.com/mozilla/glean/pull/2415))
+* Python
+  * BUGFIX: Implement an empty shutdown function ([#2417](https://github.com/mozilla/glean/pull/2417))
+
+# v52.4.1 (2023-03-10)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v52.4.0...v52.4.1)
+
+* General
+  * Update `tempfile` crate to remove dependency on potentially vulnerable version of `remove_dir_all@0.5.3`
+
+# v52.4.0 (2023-03-09)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v52.3.1...v52.4.0)
+
+* General
+  * Update `glean_parser` to v7.1.0 ([release notes](https://github.com/mozilla/glean_parser/releases/tag/v7.1.0))
+* Kotlin
+  * Upgrade Android NDK to r25c ([#2399](https://github.com/mozilla/glean/pull/2399))
+* iOS
+  * BUGFIX: Reworking the HTTP uploader to avoid background uploading issues ([Bug 1819161](https://bugzilla.mozilla.org/show_bug.cgi?id=1819161))
+
+# v52.3.1 (2023-03-01)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v52.3.0...v52.3.1)
+
+* General
+  * No functional change from v52.3.0, just CI updates.
+
+# v52.3.0 (2023-02-23)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v52.2.0...v52.3.0)
+
+* General
+  * Loosen label restrictions to "at most 71 characters of printable ASCII" ([bug 1672273](https://bugzilla.mozilla.org/show_bug.cgi?id=1672273))
+  * Introduced 2 new Glean health metrics: `glean.upload.send_failure` and `glean.upload.send_success` to measure the time for sending a ping ([#2365](https://github.com/mozilla/glean/pull/2365))
+  * Introduced a new Glean metric: `glean.validation.shutdown_wait` to measure the time Glean waits for the uploader on shutdown ([#2365](https://github.com/mozilla/glean/pull/2365))
+* Rust
+  * On shutdown wait up to 30s on the uploader to finish work ([#2232](https://github.com/mozilla/glean/pull/2332))
+* iOS
+  * BUGFIX: Avoid an invalid state (double-starting) for `baseline.duration` when Glean is first initialized ([#2368](https://github.com/mozilla/glean/pull/2368))
+
+# v52.2.0 (2023-01-30)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v52.1.1...v52.2.0)
+
+* General
+  * Update to UniFFI 0.23 ([#2338](https://github.com/mozilla/glean/pull/2338))
+
+# v52.1.1 (2023-01-26)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v52.1.0...v52.1.1)
+
+* General
+  * BUGFIX: Properly invoke the windows build number function from whatsys ([bug 1812672](https://bugzilla.mozilla.org/show_bug.cgi?id=1812672))
+
+# v52.1.0 (2023-01-26)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v52.0.1...v52.1.0)
+
+* General
+  * BUGFIX: Custom Pings with events should no longer erroneously post `InvalidState` errors ([bug 1811872](https://bugzilla.mozilla.org/show_bug.cgi?id=1811872))
+  * Upgrade to `glean_parser` v7.0.0 ([#2346](https://github.com/mozilla/glean/pull/2346))
+* Kotlin
+  * Update to Gradle v7.6 ([#2317](https://github.com/mozilla/glean/pull/2317))
+* Rust
+  * Added a new `client_info` field `windows_build_number` (Windows only) ([#2325](https://github.com/mozilla/glean/pull/2325))
+  * A new `ConfigurationBuilder` allows to create the Glean configuration before initialization ([#2313](https://github.com/mozilla/glean/pull/2313))
+  * Drop dependency on `env_logger` for regular builds ([#2312](https://github.com/mozilla/glean/pull/2312))
+
+# v52.0.1 (2023-01-19)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v52.0.0...v52.0.1)
+
+* Android
+  * The `GleanDebugActivity` can run without Glean being initialized ([#2336](https://github.com/mozilla/glean/pull/2336))
+* Python
+  * Ship `universal2` (`aarch64` + `x86_64` in one) wheels ([#2340](https://github.com/mozilla/glean/pull/2340))
+
+# v52.0.0 (2022-12-13)
+
+[Full changelog](https://github.com/mozilla/glean/compare/v51.8.3...v52.0.0)
 
 * General
   * Remove the metric `glean.validation.first_run_hour`. Note that this will mean no `reason=upgrade` metrics pings from freshly installed clients anymore. ([#2271](https://github.com/mozilla/glean/pull/2271))
@@ -15,6 +438,7 @@
     * This change has no effect when the API is not used and is transparent to consumers. The API is currently experimental because it is not stable and may change.
 * Rust
   * Static labels for labeled metrics are now `Cow<'static, str>` to reduce heap allocations ([#2272](https://github.com/mozilla/glean/pull/2272))
+  * NEW INTERNAL CONFIGURATION OPTION: `trim_data_to_registered_pings` will trim event storage to just the registered pings. Consult with the Glean Team before using. ([bug 1804915](https://bugzilla.mozilla.org/show_bug.cgi?id=1804915))
 
 # v51.8.3 (2022-11-25)
 

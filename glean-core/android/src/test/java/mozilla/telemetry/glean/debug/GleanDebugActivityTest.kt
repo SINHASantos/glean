@@ -12,12 +12,7 @@ import androidx.test.core.app.ActivityScenario.launch
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import mozilla.telemetry.glean.Glean
-import mozilla.telemetry.glean.config.Configuration
 import mozilla.telemetry.glean.getMockWebServer
-import mozilla.telemetry.glean.net.HeadersList
-import mozilla.telemetry.glean.net.HttpStatus
-import mozilla.telemetry.glean.net.PingUploader
-import mozilla.telemetry.glean.net.UploadResult
 import mozilla.telemetry.glean.private.BooleanMetricType
 import mozilla.telemetry.glean.private.CommonMetricData
 import mozilla.telemetry.glean.private.Lifetime
@@ -38,37 +33,6 @@ import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import java.util.concurrent.TimeUnit
 
-/**
- * This is a helper class to facilitate testing of ping tagging
- */
-private class TestPingTagClient(
-    private val responseUrl: String = Configuration.DEFAULT_TELEMETRY_ENDPOINT,
-    private val debugHeaderValue: String? = null,
-    private val sourceTagsValue: Set<String>? = null
-) : PingUploader {
-    override fun upload(url: String, data: ByteArray, headers: HeadersList): UploadResult {
-        assertTrue(
-            "URL must be redirected for tagged pings",
-            url.startsWith(responseUrl)
-        )
-        debugHeaderValue?.let {
-            assertEquals(
-                "The debug view header must match what the ping tag was set to",
-                debugHeaderValue, headers.get("X-Debug-ID")!!
-            )
-        }
-        sourceTagsValue?.let {
-            assertEquals(
-                "The source tags header must match what the ping tag was set to",
-                sourceTagsValue.joinToString(","), headers.get("X-Source-Tags")!!
-            )
-        }
-
-        return HttpStatus(200)
-    }
-}
-
-@Ignore("Fails with robolectric 4.5.1 - see bug 1698471")
 @RunWith(AndroidJUnit4::class)
 class GleanDebugActivityTest {
 
@@ -109,12 +73,13 @@ class GleanDebugActivityTest {
         shadowOf(pm).addOrUpdateActivity(hiddenActivity)
     }
 
+    @Ignore("Fails with robolectric 4.5.1 - see bug 1698471")
     @Test
     fun `the main activity is correctly started and intent args are propagated`() {
         // Build the intent that will call our debug activity, with no extra.
         val intent = Intent(
             ApplicationProvider.getApplicationContext<Context>(),
-            GleanDebugActivity::class.java
+            GleanDebugActivity::class.java,
         )
         // Add at least an option, otherwise the activity will be removed.
         intent.putExtra(GleanDebugActivity.LOG_PINGS_EXTRA_KEY, true)
@@ -131,17 +96,37 @@ class GleanDebugActivityTest {
         }
     }
 
+    // TODO(jer): can we make this actually test something?
+    // What we would want to do is really just the
+    // "a custom activity is correctly started" test below:
+    //
+    // Even when Glean is not initialized we want the debug activity to run through,
+    // not crash and just work.
+    // If Glean is initialized later it should still trigger the debug activity tasks.
+    @Test
+    fun `it works without Glean initialized`() {
+        // Destroy Glean. Launching the Debug Activity should only schedule tasks,
+        // so they run once Glean is initialized.
+        Glean.testDestroyGleanHandle()
+
+        // Set the extra values and start the intent.
+        val intent = Intent(
+            ApplicationProvider.getApplicationContext<Context>(),
+            GleanDebugActivity::class.java,
+        )
+        intent.putExtra(GleanDebugActivity.SEND_PING_EXTRA_KEY, "metrics")
+        launch<GleanDebugActivity>(intent)
+    }
+
     @Test
     fun `pings are sent using sendPing`() {
         val server = getMockWebServer()
 
+        // Destroy Glean. Launching the Debug Activity should only schedule tasks,
+        // so they run once Glean is initialized.
+        Glean.testDestroyGleanHandle()
+
         val context = ApplicationProvider.getApplicationContext<Context>()
-        resetGlean(
-            context,
-            Glean.configuration.copy(
-                serverEndpoint = "http://" + server.hostName + ":" + server.port
-            )
-        )
 
         // Put some metric data in the store, otherwise we won't get a ping out
         // Define a 'booleanMetric' boolean metric, which will be stored in "store1"
@@ -151,33 +136,35 @@ class GleanDebugActivityTest {
                 category = "telemetry",
                 lifetime = Lifetime.APPLICATION,
                 name = "boolean_metric",
-                sendInPings = listOf("metrics")
-            )
+                sendInPings = listOf("metrics"),
+            ),
         )
 
         booleanMetric.set(true)
-        assertTrue(booleanMetric.testGetValue()!!)
 
         // Set the extra values and start the intent.
         val intent = Intent(
             ApplicationProvider.getApplicationContext<Context>(),
-            GleanDebugActivity::class.java
+            GleanDebugActivity::class.java,
         )
         intent.putExtra(GleanDebugActivity.SEND_PING_EXTRA_KEY, "metrics")
         launch<GleanDebugActivity>(intent)
 
+        val config = Glean.configuration.copy(
+            serverEndpoint = "http://" + server.hostName + ":" + server.port,
+        )
+        resetGlean(context, config)
+
         // Since we reset the serverEndpoint back to the default for untagged pings, we need to
         // override it here so that the local server we created to intercept the pings will
         // be the one that the ping is sent to.
-        Glean.configuration = Glean.configuration.copy(
-            serverEndpoint = "http://" + server.hostName + ":" + server.port
-        )
+        Glean.configuration = config
 
         triggerWorkManager(context)
         val request = server.takeRequest(10L, TimeUnit.SECONDS)!!
 
         assertTrue(
-            request.requestUrl!!.encodedPath.startsWith("/submit/mozilla-telemetry-glean-test/metrics")
+            request.requestUrl!!.encodedPath.startsWith("/submit/mozilla-telemetry-glean-test/metrics"),
         )
 
         server.shutdown()
@@ -191,8 +178,8 @@ class GleanDebugActivityTest {
         resetGlean(
             context,
             Glean.configuration.copy(
-                serverEndpoint = "http://" + server.hostName + ":" + server.port
-            )
+                serverEndpoint = "http://" + server.hostName + ":" + server.port,
+            ),
         )
 
         // Put some metric data in the store, otherwise we won't get a ping out
@@ -203,8 +190,8 @@ class GleanDebugActivityTest {
                 category = "telemetry",
                 lifetime = Lifetime.APPLICATION,
                 name = "boolean_metric",
-                sendInPings = listOf("metrics")
-            )
+                sendInPings = listOf("metrics"),
+            ),
         )
 
         booleanMetric.set(true)
@@ -213,7 +200,7 @@ class GleanDebugActivityTest {
         // Set the extra values and start the intent.
         val intent = Intent(
             ApplicationProvider.getApplicationContext<Context>(),
-            GleanDebugActivity::class.java
+            GleanDebugActivity::class.java,
         )
         intent.putExtra(GleanDebugActivity.SEND_PING_EXTRA_KEY, "metrics")
         intent.putExtra(GleanDebugActivity.TAG_DEBUG_VIEW_EXTRA_KEY, "inv@lid_id")
@@ -223,7 +210,8 @@ class GleanDebugActivityTest {
         // has happened.
         assertEquals(
             "Server endpoint must be reset if tag didn't pass regex",
-            "http://" + server.hostName + ":" + server.port, Glean.configuration.serverEndpoint
+            "http://" + server.hostName + ":" + server.port,
+            Glean.configuration.serverEndpoint,
         )
 
         triggerWorkManager(context)
@@ -231,7 +219,7 @@ class GleanDebugActivityTest {
 
         assertTrue(
             "Request path must be correct",
-            request.requestUrl!!.encodedPath.startsWith("/submit/mozilla-telemetry-glean-test/metrics")
+            request.requestUrl!!.encodedPath.startsWith("/submit/mozilla-telemetry-glean-test/metrics"),
         )
 
         // resetGlean doesn't actually reset the debug view tag,
@@ -243,15 +231,15 @@ class GleanDebugActivityTest {
 
     @Test
     fun `pings are correctly tagged using sourceTags`() {
+        val server = getMockWebServer()
         val testTags = setOf("tag1", "tag2")
 
-        // Use the test client in the Glean configuration
         val context = ApplicationProvider.getApplicationContext<Context>()
         resetGlean(
             context,
             Glean.configuration.copy(
-                httpClient = TestPingTagClient(sourceTagsValue = testTags)
-            )
+                serverEndpoint = "http://" + server.hostName + ":" + server.port,
+            ),
         )
 
         // Create a custom ping for testing. Since we're testing headers,
@@ -260,13 +248,18 @@ class GleanDebugActivityTest {
             name = "custom",
             includeClientId = false,
             sendIfEmpty = true,
-            reasonCodes = listOf()
+            preciseTimestamps = true,
+            includeInfoSections = true,
+            enabled = true,
+            schedulesPings = emptyList(),
+            reasonCodes = listOf(),
+            followsCollectionEnabled = true,
         )
 
         // Set the extra values and start the intent.
         val intent = Intent(
             ApplicationProvider.getApplicationContext<Context>(),
-            GleanDebugActivity::class.java
+            GleanDebugActivity::class.java,
         )
         intent.putExtra(GleanDebugActivity.SEND_PING_EXTRA_KEY, "metrics")
         intent.putExtra(GleanDebugActivity.SOURCE_TAGS_KEY, testTags.toTypedArray())
@@ -274,17 +267,32 @@ class GleanDebugActivityTest {
 
         customPing.submit()
 
-        // This will trigger the call to `fetch()` in the TestPingTagClient which is where the
-        // test assertions will occur
         triggerWorkManager(context)
+
+        val expectedTags = testTags.joinToString(",")
+
+        // Expecting 2 pings: metrics, custom
+        for (i in 1..2) {
+            val request = server.takeRequest(10L, TimeUnit.SECONDS)!!
+
+            assertTrue(
+                "Request path must be correct",
+                request.requestUrl!!.encodedPath.startsWith("/submit/mozilla-telemetry-glean-test"),
+            )
+
+            assertEquals(expectedTags, request.headers.get("X-Source-Tags"))
+        }
+
+        server.shutdown()
     }
 
+    @Ignore("Fails with robolectric 4.5.1 - see bug 1698471")
     @Test
     fun `a custom activity is correctly started`() {
         // Build the intent that will call our debug activity, with no extra.
         val intent = Intent(
             ApplicationProvider.getApplicationContext<Context>(),
-            GleanDebugActivity::class.java
+            GleanDebugActivity::class.java,
         )
         // Add at least an option, otherwise the activity will be removed.
         intent.putExtra(GleanDebugActivity.NEXT_ACTIVITY_TO_RUN, "OtherActivity")
@@ -302,12 +310,13 @@ class GleanDebugActivityTest {
         }
     }
 
+    @Ignore("Fails with robolectric 4.5.1 - see bug 1698471")
     @Test
     fun `non-exported activity is not started`() {
         // Build the intent that will call our debug activity, with no extra.
         val intent = Intent(
             ApplicationProvider.getApplicationContext<Context>(),
-            GleanDebugActivity::class.java
+            GleanDebugActivity::class.java,
         )
         // Add at least an option, otherwise the activity will be removed.
         intent.putExtra(GleanDebugActivity.NEXT_ACTIVITY_TO_RUN, "HiddenActivity")

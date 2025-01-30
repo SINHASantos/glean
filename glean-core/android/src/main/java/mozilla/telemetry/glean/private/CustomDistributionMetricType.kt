@@ -30,13 +30,14 @@ class CustomDistributionMetricType(
     rangeMin: Long,
     rangeMax: Long,
     bucketCount: Long,
-    histogramType: HistogramType
+    histogramType: HistogramType,
 ) : HistogramBase {
     val inner = CustomDistributionMetric(meta, rangeMin, rangeMax, bucketCount, histogramType)
 
     /**
      * Delegate common methods to the underlying type directly.
      */
+    fun accumulateSingleSample(sample: Long) = inner.accumulateSingleSample(sample)
     override fun accumulateSamples(samples: List<Long>) = inner.accumulateSamples(samples)
 
     /**

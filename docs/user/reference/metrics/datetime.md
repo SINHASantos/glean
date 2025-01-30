@@ -22,7 +22,7 @@ Sets a datetime metric to a specific date value. Defaults to now.
 import org.mozilla.yourApplication.GleanMetrics.Install
 
 Install.firstRun.set() // Records "now"
-Install.firstRun.set(Calendar(2019, 3, 25)) // Records a custom datetime
+Install.firstRun.set(Date(2019, 3, 25)) // Records a custom datetime
 ```
 
 </div>
@@ -33,7 +33,7 @@ Install.firstRun.set(Calendar(2019, 3, 25)) // Records a custom datetime
 import org.mozilla.yourApplication.GleanMetrics.Install;
 
 Install.INSTANCE.firstRun().set(); // Records "now"
-Install.INSTANCE.firstRun().set(Calendar(2019, 3, 25)); // Records a custom datetime
+Install.INSTANCE.firstRun().set(new Date(2019, 3, 25)); // Records a custom datetime
 ```
 
 </div>
@@ -93,7 +93,7 @@ install.firstRun.set(new Date("March 25, 2019 00:00:00")); // Records a custom d
 **C++**
 
 ```c++
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/ToolkitProfileMetrics.h"
 
 PRExplodedTime date = {0, 35, 10, 12, 6, 10, 2020, 0, 0, {5 * 60 * 60, 0}};
 mozilla::glean::install::first_run.Set(&date);
@@ -121,6 +121,8 @@ Glean.install.firstRun.set(value.getTime() * 1000);
 
 Get the recorded value for a given datetime metric as a language-specific Datetime object.  
 Returns a language-specific empty/null value if no data is stored.
+Has an optional argument to specify the name of the ping you wish to retrieve data from, except
+in Rust where it's required. `None` or no argument will default to the first value found for `send_in_pings`.
 
 {{#include ../../../shared/tab_header.md}}
 
@@ -194,7 +196,7 @@ assert.deepStrictEqual(expectedDate, await install.firstRun.testGetValue());
 **C++**
 
 ```c++
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/ToolkitProfileMetrics.h"
 
 PRExplodedTime date{0, 35, 10, 12, 6, 10, 2020, 0, 0, {5 * 60 * 60, 0}};
 ASSERT_TRUE(mozilla::glean::install::first_run.TestGetValue().isOk());
@@ -413,6 +415,5 @@ Carefully consider the required resolution for recording your metric, and choose
 ## Reference
 
 * [Swift API docs](../../../swift/Classes/DatetimeMetricType.html)
-* [Python API docs](../../../python/glean/metrics/datetime.html)
+* [Python API docs](../../../python/glean/metrics/index.html#glean.metrics.DatetimeMetricType)
 * [Rust API docs](../../../docs/glean/private/struct.DatetimeMetric.html)
-* [Datetime API docs](https://mozilla.github.io/glean.js/classes/core_metrics_types_datetime.default.html)

@@ -8,6 +8,21 @@ import androidx.annotation.VisibleForTesting
 import mozilla.telemetry.glean.internal.PingType as GleanPingType
 
 /**
+ * A ping's reason codes.
+ *
+ * Reason codes are expressed as an enum
+ * and can be converted back to their ordinal representation,
+ * which also maps to their string representation.
+ *
+ * This is automatically implemented for generated enums.
+ */
+interface ReasonCode {
+    fun code(): Int {
+        error("can't determine reason code")
+    }
+}
+
+/**
  * An enum with no values for convenient use as the default set of reason codes.
  */
 @Suppress("EmptyClassBlock")
@@ -15,8 +30,8 @@ enum class NoReasonCodes(
     /**
      * @suppress
      */
-    val value: Int
-) {
+    val value: Int,
+) : ReasonCode {
     // deliberately empty
 }
 
@@ -29,12 +44,18 @@ enum class NoReasonCodes(
  *
  * @property reasonCodes The list of acceptable reason codes for this ping.
  */
-class PingType<ReasonCodesEnum : Enum<ReasonCodesEnum>> (
+@Suppress("LongParameterList")
+class PingType<ReasonCodesEnum> (
     name: String,
     includeClientId: Boolean,
     sendIfEmpty: Boolean,
-    val reasonCodes: List<String>
-) {
+    preciseTimestamps: Boolean,
+    includeInfoSections: Boolean,
+    enabled: Boolean,
+    val schedulesPings: List<String>,
+    val reasonCodes: List<String>,
+    followsCollectionEnabled: Boolean,
+) where ReasonCodesEnum : Enum<ReasonCodesEnum>, ReasonCodesEnum : ReasonCode {
     private var testCallback: ((ReasonCodesEnum?) -> Unit)? = null
     private val innerPing: GleanPingType
 
@@ -43,7 +64,12 @@ class PingType<ReasonCodesEnum : Enum<ReasonCodesEnum>> (
             name = name,
             includeClientId = includeClientId,
             sendIfEmpty = sendIfEmpty,
-            reasonCodes = reasonCodes
+            preciseTimestamps = preciseTimestamps,
+            includeInfoSections = includeInfoSections,
+            schedulesPings = schedulesPings,
+            reasonCodes = reasonCodes,
+            enabled = enabled,
+            followsCollectionEnabled = followsCollectionEnabled,
         )
     }
 
@@ -81,7 +107,17 @@ class PingType<ReasonCodesEnum : Enum<ReasonCodesEnum>> (
         }
         this.testCallback = null
 
-        val reasonString = reason?.let { this.reasonCodes[it.ordinal] }
+        val reasonString = reason?.let { this.reasonCodes[it.code()] }
         this.innerPing.submit(reasonString)
+    }
+
+    /**
+     * Enable or disable a ping.
+     *
+     * Disabling a ping causes all data for that ping to be removed from storage
+     * and all pending pings of that type to be deleted.
+     */
+    fun setEnabled(enabled: Boolean) {
+        this.innerPing.setEnabled(enabled)
     }
 }

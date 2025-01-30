@@ -8,7 +8,7 @@ Currently, this SDK only supports the iOS platform.
 
 ## Requirements
 
-* Python >= 3.6.
+* Python >= 3.8.
 
 ## Setting up the dependency
 

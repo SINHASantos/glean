@@ -10,19 +10,21 @@ use serde_json::json;
 use glean_core::metrics::*;
 use glean_core::storage::StorageManager;
 use glean_core::{test_get_num_recorded_errors, ErrorType};
-use glean_core::{CommonMetricData, Lifetime};
+use glean_core::{CommonMetricData, HistogramType, LabeledMetricData, Lifetime};
 
 #[test]
 fn can_create_labeled_counter_metric() {
     let (glean, _t) = new_glean(None);
     let labeled = LabeledCounter::new(
-        CommonMetricData {
-            name: "labeled_metric".into(),
-            category: "telemetry".into(),
-            send_in_pings: vec!["store1".into()],
-            disabled: false,
-            lifetime: Lifetime::Ping,
-            ..Default::default()
+        LabeledMetricData::Common {
+            cmd: CommonMetricData {
+                name: "labeled_metric".into(),
+                category: "telemetry".into(),
+                send_in_pings: vec!["store1".into()],
+                disabled: false,
+                lifetime: Lifetime::Ping,
+                ..Default::default()
+            },
         },
         Some(vec!["label1".into()]),
     );
@@ -48,13 +50,15 @@ fn can_create_labeled_counter_metric() {
 fn can_create_labeled_string_metric() {
     let (glean, _t) = new_glean(None);
     let labeled = LabeledString::new(
-        CommonMetricData {
-            name: "labeled_metric".into(),
-            category: "telemetry".into(),
-            send_in_pings: vec!["store1".into()],
-            disabled: false,
-            lifetime: Lifetime::Ping,
-            ..Default::default()
+        LabeledMetricData::Common {
+            cmd: CommonMetricData {
+                name: "labeled_metric".into(),
+                category: "telemetry".into(),
+                send_in_pings: vec!["store1".into()],
+                disabled: false,
+                lifetime: Lifetime::Ping,
+                ..Default::default()
+            },
         },
         Some(vec!["label1".into()]),
     );
@@ -80,13 +84,15 @@ fn can_create_labeled_string_metric() {
 fn can_create_labeled_bool_metric() {
     let (glean, _t) = new_glean(None);
     let labeled = LabeledBoolean::new(
-        CommonMetricData {
-            name: "labeled_metric".into(),
-            category: "telemetry".into(),
-            send_in_pings: vec!["store1".into()],
-            disabled: false,
-            lifetime: Lifetime::Ping,
-            ..Default::default()
+        LabeledMetricData::Common {
+            cmd: CommonMetricData {
+                name: "labeled_metric".into(),
+                category: "telemetry".into(),
+                send_in_pings: vec!["store1".into()],
+                disabled: false,
+                lifetime: Lifetime::Ping,
+                ..Default::default()
+            },
         },
         Some(vec!["label1".into()]),
     );
@@ -109,16 +115,160 @@ fn can_create_labeled_bool_metric() {
 }
 
 #[test]
+fn can_create_labeled_custom_distribution_metric() {
+    let (glean, _t) = new_glean(None);
+    let labeled = LabeledCustomDistribution::new(
+        LabeledMetricData::CustomDistribution {
+            cmd: CommonMetricData {
+                name: "labeled_metric".into(),
+                category: "telemetry".into(),
+                send_in_pings: vec!["store1".into()],
+                disabled: false,
+                lifetime: Lifetime::Ping,
+                ..Default::default()
+            },
+            range_min: 0,
+            range_max: 1024,
+            bucket_count: 1,
+            histogram_type: HistogramType::Linear,
+        },
+        Some(vec!["label1".into()]),
+    );
+
+    let metric = labeled.get("label1");
+    metric.accumulate_samples_sync(&glean, &[42]);
+
+    let snapshot = StorageManager
+        .snapshot_as_json(glean.storage(), "store1", true)
+        .unwrap();
+
+    assert_eq!(
+        json!({
+            "labeled_custom_distribution": {
+                "telemetry.labeled_metric": { "label1": { "sum": 42, "values": {"0": 1} } }
+            }
+        }),
+        snapshot
+    );
+}
+
+#[test]
+fn can_create_labeled_memory_distribution_metric() {
+    let (glean, _t) = new_glean(None);
+    let labeled = LabeledMemoryDistribution::new(
+        LabeledMetricData::MemoryDistribution {
+            cmd: CommonMetricData {
+                name: "labeled_metric".into(),
+                category: "telemetry".into(),
+                send_in_pings: vec!["store1".into()],
+                disabled: false,
+                lifetime: Lifetime::Ping,
+                ..Default::default()
+            },
+            unit: MemoryUnit::Byte,
+        },
+        Some(vec!["label1".into()]),
+    );
+
+    let metric = labeled.get("label1");
+    metric.accumulate_samples_sync(&glean, vec![42]);
+
+    let snapshot = StorageManager
+        .snapshot_as_json(glean.storage(), "store1", true)
+        .unwrap();
+
+    assert_eq!(
+        json!({
+            "labeled_memory_distribution": {
+                "telemetry.labeled_metric": { "label1": { "sum": 42, "values": {"41": 1} } }
+            }
+        }),
+        snapshot
+    );
+}
+
+#[test]
+fn can_create_labeled_timing_distribution_metric() {
+    let (glean, _t) = new_glean(None);
+    let labeled = LabeledTimingDistribution::new(
+        LabeledMetricData::TimingDistribution {
+            cmd: CommonMetricData {
+                name: "labeled_metric".into(),
+                category: "telemetry".into(),
+                send_in_pings: vec!["store1".into()],
+                disabled: false,
+                lifetime: Lifetime::Ping,
+                ..Default::default()
+            },
+            unit: TimeUnit::Nanosecond,
+        },
+        Some(vec!["label1".into()]),
+    );
+
+    let metric = labeled.get("label1");
+    metric.accumulate_samples_sync(&glean, &[42]);
+
+    let snapshot = StorageManager
+        .snapshot_as_json(glean.storage(), "store1", true)
+        .unwrap();
+
+    assert_eq!(
+        json!({
+            "labeled_timing_distribution": {
+                "telemetry.labeled_metric": { "label1": { "sum": 42, "values": {"41": 1} } }
+            }
+        }),
+        snapshot
+    );
+}
+
+#[test]
+fn can_create_labeled_quantity_metric() {
+    let (glean, _t) = new_glean(None);
+    let labeled = LabeledQuantity::new(
+        LabeledMetricData::Common {
+            cmd: CommonMetricData {
+                name: "labeled_metric".into(),
+                category: "telemetry".into(),
+                send_in_pings: vec!["store1".into()],
+                disabled: false,
+                lifetime: Lifetime::Ping,
+                ..Default::default()
+            },
+        },
+        Some(vec!["label1".into()]),
+    );
+
+    let metric = labeled.get("label1");
+    metric.set_sync(&glean, 42);
+
+    let snapshot = StorageManager
+        .snapshot_as_json(glean.storage(), "store1", true)
+        .unwrap();
+
+    assert_eq!(
+        json!({
+            "labeled_quantity": {
+                "telemetry.labeled_metric": { "label1": 42, },
+            }
+        }),
+        snapshot
+    );
+}
+
+#[test]
 fn can_use_multiple_labels() {
     let (glean, _t) = new_glean(None);
     let labeled = LabeledCounter::new(
-        CommonMetricData {
-            name: "labeled_metric".into(),
-            category: "telemetry".into(),
-            send_in_pings: vec!["store1".into()],
-            disabled: false,
-            lifetime: Lifetime::Ping,
-            ..Default::default()
+        LabeledMetricData::Common {
+            cmd: CommonMetricData {
+                name: "labeled_metric".into(),
+                category: "telemetry".into(),
+                send_in_pings: vec!["store1".into()],
+                disabled: false,
+                lifetime: Lifetime::Ping,
+                ..Default::default()
+            },
         },
         None,
     );
@@ -150,19 +300,21 @@ fn can_use_multiple_labels() {
 fn can_record_error_for_submetric() {
     let (glean, _t) = new_glean(None);
     let labeled = LabeledString::new(
-        CommonMetricData {
-            name: "labeled_metric".into(),
-            category: "telemetry".into(),
-            send_in_pings: vec!["store1".into()],
-            disabled: false,
-            lifetime: Lifetime::Ping,
-            ..Default::default()
+        LabeledMetricData::Common {
+            cmd: CommonMetricData {
+                name: "labeled_metric".into(),
+                category: "telemetry".into(),
+                send_in_pings: vec!["store1".into()],
+                disabled: false,
+                lifetime: Lifetime::Ping,
+                ..Default::default()
+            },
         },
         Some(vec!["label1".into()]),
     );
 
     let metric = labeled.get("label1");
-    metric.set_sync(&glean, "01234567890".repeat(20));
+    metric.set_sync(&glean, "01234567890".repeat(26));
 
     // Make sure that the errors have been recorded
     assert_eq!(
@@ -175,13 +327,15 @@ fn can_record_error_for_submetric() {
 fn labels_are_checked_against_static_list() {
     let (glean, _t) = new_glean(None);
     let labeled = LabeledCounter::new(
-        CommonMetricData {
-            name: "labeled_metric".into(),
-            category: "telemetry".into(),
-            send_in_pings: vec!["store1".into()],
-            disabled: false,
-            lifetime: Lifetime::Ping,
-            ..Default::default()
+        LabeledMetricData::Common {
+            cmd: CommonMetricData {
+                name: "labeled_metric".into(),
+                category: "telemetry".into(),
+                send_in_pings: vec!["store1".into()],
+                disabled: false,
+                lifetime: Lifetime::Ping,
+                ..Default::default()
+            },
         },
         Some(vec!["label1".into(), "label2".into()]),
     );
@@ -220,18 +374,20 @@ fn labels_are_checked_against_static_list() {
 fn dynamic_labels_too_long() {
     let (glean, _t) = new_glean(None);
     let labeled = LabeledCounter::new(
-        CommonMetricData {
-            name: "labeled_metric".into(),
-            category: "telemetry".into(),
-            send_in_pings: vec!["store1".into()],
-            disabled: false,
-            lifetime: Lifetime::Ping,
-            ..Default::default()
+        LabeledMetricData::Common {
+            cmd: CommonMetricData {
+                name: "labeled_metric".into(),
+                category: "telemetry".into(),
+                send_in_pings: vec!["store1".into()],
+                disabled: false,
+                lifetime: Lifetime::Ping,
+                ..Default::default()
+            },
         },
         None,
     );
 
-    let metric = labeled.get("this_string_has_more_than_thirty_characters");
+    let metric = labeled.get("1".repeat(72));
     metric.add_sync(&glean, 1);
 
     let snapshot = StorageManager
@@ -255,26 +411,20 @@ fn dynamic_labels_too_long() {
 fn dynamic_labels_regex_mismatch() {
     let (glean, _t) = new_glean(None);
     let labeled = LabeledCounter::new(
-        CommonMetricData {
-            name: "labeled_metric".into(),
-            category: "telemetry".into(),
-            send_in_pings: vec!["store1".into()],
-            disabled: false,
-            lifetime: Lifetime::Ping,
-            ..Default::default()
+        LabeledMetricData::Common {
+            cmd: CommonMetricData {
+                name: "labeled_metric".into(),
+                category: "telemetry".into(),
+                send_in_pings: vec!["store1".into()],
+                disabled: false,
+                lifetime: Lifetime::Ping,
+                ..Default::default()
+            },
         },
         None,
     );
 
-    let labels_not_validating = vec![
-        "notSnakeCase",
-        "",
-        "with/slash",
-        "1.not_fine",
-        "this.$isnotfine",
-        "-.not_fine",
-        "this.is_not_fine.2",
-    ];
+    let labels_not_validating = vec!["non-ASCII�"];
     let num_non_validating = labels_not_validating.len();
 
     for label in &labels_not_validating {
@@ -302,13 +452,15 @@ fn dynamic_labels_regex_mismatch() {
 fn dynamic_labels_regex_allowed() {
     let (glean, _t) = new_glean(None);
     let labeled = LabeledCounter::new(
-        CommonMetricData {
-            name: "labeled_metric".into(),
-            category: "telemetry".into(),
-            send_in_pings: vec!["store1".into()],
-            disabled: false,
-            lifetime: Lifetime::Ping,
-            ..Default::default()
+        LabeledMetricData::Common {
+            cmd: CommonMetricData {
+                name: "labeled_metric".into(),
+                category: "telemetry".into(),
+                send_in_pings: vec!["store1".into()],
+                disabled: false,
+                lifetime: Lifetime::Ping,
+                ..Default::default()
+            },
         },
         None,
     );
@@ -357,13 +509,15 @@ fn seen_labels_get_reloaded_from_disk() {
     tempdir = dir;
 
     let labeled = LabeledCounter::new(
-        CommonMetricData {
-            name: "labeled_metric".into(),
-            category: "telemetry".into(),
-            send_in_pings: vec!["store1".into()],
-            disabled: false,
-            lifetime: Lifetime::Ping,
-            ..Default::default()
+        LabeledMetricData::Common {
+            cmd: CommonMetricData {
+                name: "labeled_metric".into(),
+                category: "telemetry".into(),
+                send_in_pings: vec!["store1".into()],
+                disabled: false,
+                lifetime: Lifetime::Ping,
+                ..Default::default()
+            },
         },
         None,
     );
@@ -372,7 +526,7 @@ fn seen_labels_get_reloaded_from_disk() {
     {
         // Set the maximum number of labels
         for i in 1..=16 {
-            let label = format!("label{}", i);
+            let label = format!("label{i}");
             labeled.get(label).add_sync(&glean, i);
         }
 
@@ -382,7 +536,7 @@ fn seen_labels_get_reloaded_from_disk() {
 
         // Check that the data is there
         for i in 1..=16 {
-            let label = format!("label{}", i);
+            let label = format!("label{i}");
             assert_eq!(
                 i,
                 snapshot["labeled_counter"]["telemetry.labeled_metric"][&label]
@@ -394,7 +548,7 @@ fn seen_labels_get_reloaded_from_disk() {
 
     // Force a reload
     {
-        let (glean, _) = new_glean(Some(tempdir));
+        let (glean, _t) = new_glean(Some(tempdir));
 
         // Try to store another label
         labeled.get("new_label").add_sync(&glean, 40);
@@ -405,7 +559,7 @@ fn seen_labels_get_reloaded_from_disk() {
 
         // Check that the old data is still there
         for i in 1..=16 {
-            let label = format!("label{}", i);
+            let label = format!("label{i}");
             assert_eq!(
                 i,
                 snapshot["labeled_counter"]["telemetry.labeled_metric"][&label]
@@ -424,13 +578,15 @@ fn seen_labels_get_reloaded_from_disk() {
 fn caching_metrics_with_dynamic_labels() {
     let (glean, _t) = new_glean(None);
     let labeled = LabeledCounter::new(
-        CommonMetricData {
-            name: "cached_labels".into(),
-            category: "telemetry".into(),
-            send_in_pings: vec!["store1".into()],
-            disabled: false,
-            lifetime: Lifetime::Ping,
-            ..Default::default()
+        LabeledMetricData::Common {
+            cmd: CommonMetricData {
+                name: "cached_labels".into(),
+                category: "telemetry".into(),
+                send_in_pings: vec!["store1".into()],
+                disabled: false,
+                lifetime: Lifetime::Ping,
+                ..Default::default()
+            },
         },
         None,
     );
@@ -438,7 +594,7 @@ fn caching_metrics_with_dynamic_labels() {
     // Create multiple metric instances and cache them for later use.
     let metrics = (1..=20)
         .map(|i| {
-            let label = format!("label{}", i);
+            let label = format!("label{i}");
             labeled.get(label)
         })
         .collect::<Vec<_>>();
@@ -458,13 +614,15 @@ fn caching_metrics_with_dynamic_labels() {
 fn caching_metrics_with_dynamic_labels_across_pings() {
     let (glean, _t) = new_glean(None);
     let labeled = LabeledCounter::new(
-        CommonMetricData {
-            name: "cached_labels2".into(),
-            category: "telemetry".into(),
-            send_in_pings: vec!["store1".into()],
-            disabled: false,
-            lifetime: Lifetime::Ping,
-            ..Default::default()
+        LabeledMetricData::Common {
+            cmd: CommonMetricData {
+                name: "cached_labels2".into(),
+                category: "telemetry".into(),
+                send_in_pings: vec!["store1".into()],
+                disabled: false,
+                lifetime: Lifetime::Ping,
+                ..Default::default()
+            },
         },
         None,
     );
@@ -472,7 +630,7 @@ fn caching_metrics_with_dynamic_labels_across_pings() {
     // Create multiple metric instances and cache them for later use.
     let metrics = (1..=20)
         .map(|i| {
-            let label = format!("label{}", i);
+            let label = format!("label{i}");
             labeled.get(label)
         })
         .collect::<Vec<_>>();

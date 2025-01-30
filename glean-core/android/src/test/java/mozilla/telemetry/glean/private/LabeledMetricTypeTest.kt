@@ -31,8 +31,8 @@ class LabeledMetricTypeTest {
                 category = "telemetry",
                 lifetime = Lifetime.APPLICATION,
                 name = "labeled_counter_metric",
-                sendInPings = listOf("metrics")
-            )
+                sendInPings = listOf("metrics"),
+            ),
         )
 
         val labeledCounterMetric = LabeledMetricType<CounterMetricType>(
@@ -41,7 +41,7 @@ class LabeledMetricTypeTest {
             lifetime = Lifetime.APPLICATION,
             name = "labeled_counter_metric",
             sendInPings = listOf("metrics"),
-            subMetric = counterMetric
+            subMetric = counterMetric,
         )
 
         labeledCounterMetric["label1"].add(1)
@@ -65,8 +65,8 @@ class LabeledMetricTypeTest {
                 category = "telemetry",
                 lifetime = Lifetime.APPLICATION,
                 name = "labeled_counter_metric",
-                sendInPings = listOf("metrics")
-            )
+                sendInPings = listOf("metrics"),
+            ),
         )
 
         val labeledCounterMetric = LabeledMetricType<CounterMetricType>(
@@ -76,7 +76,7 @@ class LabeledMetricTypeTest {
             name = "labeled_counter_metric",
             sendInPings = listOf("metrics"),
             subMetric = counterMetric,
-            labels = setOf("foo", "bar", "baz")
+            labels = setOf("foo", "bar", "baz"),
         )
 
         labeledCounterMetric["foo"].add(1)
@@ -101,8 +101,8 @@ class LabeledMetricTypeTest {
                 category = "telemetry",
                 lifetime = Lifetime.APPLICATION,
                 name = "labeled_counter_metric",
-                sendInPings = listOf("metrics")
-            )
+                sendInPings = listOf("metrics"),
+            ),
         )
 
         val labeledCounterMetric = LabeledMetricType<CounterMetricType>(
@@ -111,7 +111,7 @@ class LabeledMetricTypeTest {
             lifetime = Lifetime.APPLICATION,
             name = "labeled_counter_metric",
             sendInPings = listOf("metrics"),
-            subMetric = counterMetric
+            subMetric = counterMetric,
         )
 
         for (i in 0..20) {
@@ -135,8 +135,8 @@ class LabeledMetricTypeTest {
                 category = "telemetry",
                 lifetime = Lifetime.APPLICATION,
                 name = "labeled_counter_metric",
-                sendInPings = listOf("metrics")
-            )
+                sendInPings = listOf("metrics"),
+            ),
         )
 
         val labeledCounterMetric = LabeledMetricType<CounterMetricType>(
@@ -145,7 +145,7 @@ class LabeledMetricTypeTest {
             lifetime = Lifetime.APPLICATION,
             name = "labeled_counter_metric",
             sendInPings = listOf("metrics"),
-            subMetric = counterMetric
+            subMetric = counterMetric,
         )
 
         // Make sure Glean isn't initialized, and turn task queueing on
@@ -175,8 +175,8 @@ class LabeledMetricTypeTest {
                 category = "telemetry",
                 lifetime = Lifetime.APPLICATION,
                 name = "labeled_counter_metric",
-                sendInPings = listOf("metrics")
-            )
+                sendInPings = listOf("metrics"),
+            ),
         )
 
         val labeledCounterMetric = LabeledMetricType<CounterMetricType>(
@@ -185,23 +185,39 @@ class LabeledMetricTypeTest {
             lifetime = Lifetime.APPLICATION,
             name = "labeled_counter_metric",
             sendInPings = listOf("metrics"),
-            subMetric = counterMetric
+            subMetric = counterMetric,
         )
 
+        // These are actually fine now.
         labeledCounterMetric["notSnakeCase"].add(1)
         labeledCounterMetric[""].add(1)
         labeledCounterMetric["with/slash"].add(1)
         labeledCounterMetric["this_string_has_more_than_thirty_characters"].add(1)
 
         assertEquals(
-            4,
+            0,
             labeledCounterMetric.testGetNumRecordedErrors(
-                ErrorType.INVALID_LABEL
-            )
+                ErrorType.INVALID_LABEL,
+            ),
         )
         assertEquals(
-            4,
-            labeledCounterMetric["__other__"].testGetValue()
+            null,
+            labeledCounterMetric["__other__"].testGetValue(),
+        )
+
+        // More than 71 characters? Not okay.
+        labeledCounterMetric["1".repeat(72)].add(1)
+        // Not ASCII? Not okay.
+        labeledCounterMetric["Møøse"].add(1)
+        assertEquals(
+            2,
+            labeledCounterMetric.testGetNumRecordedErrors(
+                ErrorType.INVALID_LABEL,
+            ),
+        )
+        assertEquals(
+            2,
+            labeledCounterMetric["__other__"].testGetValue(),
         )
     }
 
@@ -213,8 +229,8 @@ class LabeledMetricTypeTest {
                 category = "telemetry",
                 lifetime = Lifetime.APPLICATION,
                 name = "labeled_boolean_metric",
-                sendInPings = listOf("metrics")
-            )
+                sendInPings = listOf("metrics"),
+            ),
         )
 
         val labeledBooleanMetric = LabeledMetricType<BooleanMetricType>(
@@ -223,23 +239,39 @@ class LabeledMetricTypeTest {
             lifetime = Lifetime.APPLICATION,
             name = "labeled_boolean_metric",
             sendInPings = listOf("metrics"),
-            subMetric = booleanMetric
+            subMetric = booleanMetric,
         )
 
+        // These are actually fine now.
         labeledBooleanMetric["notSnakeCase"].set(true)
         labeledBooleanMetric[""].set(true)
         labeledBooleanMetric["with/slash"].set(true)
         labeledBooleanMetric["this_string_has_more_than_thirty_characters"].set(true)
 
         assertEquals(
-            4,
+            0,
             labeledBooleanMetric.testGetNumRecordedErrors(
-                ErrorType.INVALID_LABEL
-            )
+                ErrorType.INVALID_LABEL,
+            ),
+        )
+        assertEquals(
+            null,
+            labeledBooleanMetric["__other__"].testGetValue(),
+        )
+
+        // More than 71 characters? Not okay.
+        labeledBooleanMetric["1".repeat(72)].set(true)
+        // Not ASCII? Not okay.
+        labeledBooleanMetric["Møøse"].set(true)
+        assertEquals(
+            2,
+            labeledBooleanMetric.testGetNumRecordedErrors(
+                ErrorType.INVALID_LABEL,
+            ),
         )
         assertEquals(
             true,
-            labeledBooleanMetric["__other__"].testGetValue()
+            labeledBooleanMetric["__other__"].testGetValue(),
         )
     }
 
@@ -251,8 +283,8 @@ class LabeledMetricTypeTest {
                 category = "telemetry",
                 lifetime = Lifetime.APPLICATION,
                 name = "labeled_string_metric",
-                sendInPings = listOf("metrics")
-            )
+                sendInPings = listOf("metrics"),
+            ),
         )
 
         val labeledStringMetric = LabeledMetricType<StringMetricType>(
@@ -261,23 +293,39 @@ class LabeledMetricTypeTest {
             lifetime = Lifetime.APPLICATION,
             name = "labeled_string_metric",
             sendInPings = listOf("metrics"),
-            subMetric = stringMetric
+            subMetric = stringMetric,
         )
 
+        // These are actually fine now.
         labeledStringMetric["notSnakeCase"].set("foo")
         labeledStringMetric[""].set("foo")
         labeledStringMetric["with/slash"].set("foo")
         labeledStringMetric["this_string_has_more_than_thirty_characters"].set("foo")
 
         assertEquals(
-            4,
+            0,
             labeledStringMetric.testGetNumRecordedErrors(
-                ErrorType.INVALID_LABEL
-            )
+                ErrorType.INVALID_LABEL,
+            ),
+        )
+        assertEquals(
+            null,
+            labeledStringMetric["__other__"].testGetValue(),
+        )
+
+        // More than 71 characters? Not okay.
+        labeledStringMetric["1".repeat(72)].set("foo")
+        // Not ASCII? Not okay.
+        labeledStringMetric["Møøse"].set("foo")
+        assertEquals(
+            2,
+            labeledStringMetric.testGetNumRecordedErrors(
+                ErrorType.INVALID_LABEL,
+            ),
         )
         assertEquals(
             "foo",
-            labeledStringMetric["__other__"].testGetValue()
+            labeledStringMetric["__other__"].testGetValue(),
         )
     }
 
@@ -289,8 +337,8 @@ class LabeledMetricTypeTest {
                 category = "telemetry",
                 lifetime = Lifetime.APPLICATION,
                 name = "labeled_string_metric",
-                sendInPings = listOf("metrics")
-            )
+                sendInPings = listOf("metrics"),
+            ),
         )
 
         val labeledStringMetric = LabeledMetricType<StringMetricType>(
@@ -299,7 +347,7 @@ class LabeledMetricTypeTest {
             lifetime = Lifetime.APPLICATION,
             name = "labeled_string_metric",
             sendInPings = listOf("metrics"),
-            subMetric = stringMetric
+            subMetric = stringMetric,
         )
 
         labeledStringMetric["label1"].set("foo")
@@ -317,8 +365,8 @@ class LabeledMetricTypeTest {
                 category = "telemetry",
                 lifetime = Lifetime.APPLICATION,
                 name = "labeled_string_list_metric",
-                sendInPings = listOf("metrics")
-            )
+                sendInPings = listOf("metrics"),
+            ),
         )
 
         val labeledBooleanMetric = LabeledMetricType<BooleanMetricType>(
@@ -327,7 +375,7 @@ class LabeledMetricTypeTest {
             lifetime = Lifetime.APPLICATION,
             name = "labeled_string_list_metric",
             sendInPings = listOf("metrics"),
-            subMetric = booleanMetric
+            subMetric = booleanMetric,
         )
 
         labeledBooleanMetric["label1"].set(false)
@@ -339,24 +387,24 @@ class LabeledMetricTypeTest {
 
     @Test(expected = IllegalStateException::class)
     fun `Test that labeled events are an exception`() {
-        val eventMetric = EventMetricType<NoExtraKeys, NoExtras>(
+        val eventMetric = EventMetricType<NoExtras>(
             CommonMetricData(
                 disabled = false,
                 category = "telemetry",
                 lifetime = Lifetime.APPLICATION,
                 name = "labeled_event_metric",
-                sendInPings = listOf("metrics")
+                sendInPings = listOf("metrics"),
             ),
-            allowedExtraKeys = emptyList()
+            allowedExtraKeys = emptyList(),
         )
 
-        val labeledEventMetric = LabeledMetricType<EventMetricType<NoExtraKeys, NoExtras>>(
+        val labeledEventMetric = LabeledMetricType<EventMetricType<NoExtras>>(
             disabled = false,
             category = "telemetry",
             lifetime = Lifetime.APPLICATION,
             name = "labeled_event_metric",
             sendInPings = listOf("metrics"),
-            subMetric = eventMetric
+            subMetric = eventMetric,
         )
 
         labeledEventMetric["label1"]
@@ -373,8 +421,8 @@ class LabeledMetricTypeTest {
                 category = "telemetry",
                 lifetime = Lifetime.APPLICATION,
                 name = "labeled_counter_metric",
-                sendInPings = listOf("metrics")
-            )
+                sendInPings = listOf("metrics"),
+            ),
         )
 
         val labeledCounterMetric = LabeledMetricType(
@@ -384,7 +432,7 @@ class LabeledMetricTypeTest {
             name = "labeled_counter_metric",
             sendInPings = listOf("metrics"),
             subMetric = counterMetric,
-            labels = setOf("foo", "bar", "baz")
+            labels = setOf("foo", "bar", "baz"),
         )
 
         // Increment using a label name first.
@@ -415,8 +463,8 @@ class LabeledMetricTypeTest {
                 category = "telemetry",
                 lifetime = Lifetime.APPLICATION,
                 name = "labeled_nocrash_counter",
-                sendInPings = listOf("metrics")
-            )
+                sendInPings = listOf("metrics"),
+            ),
         )
 
         val labeledCounterMetric = LabeledMetricType(
@@ -426,7 +474,7 @@ class LabeledMetricTypeTest {
             name = "labeled_nocrash",
             sendInPings = listOf("metrics"),
             subMetric = counterMetric,
-            labels = setOf("foo")
+            labels = setOf("foo"),
         )
 
         // We go higher than the maximum of `(1<<15)-1 = 32767`.

@@ -30,27 +30,27 @@ class LabeledMetricType<T>(
     name: String,
     private val labels: Set<String>? = null,
     private val sendInPings: List<String>,
-    private val subMetric: T
+    private val subMetric: T,
 ) {
     // The inner labeled metric, from which actual metrics are constructed.
     private val inner: Any
 
     init {
-        val meta = CommonMetricData(
-            category = category,
-            name = name,
-            sendInPings = sendInPings,
-            disabled = disabled,
-            lifetime = lifetime
+        val meta = CommonLabeledMetricData(
+            cmd = CommonMetricData(
+                category = category,
+                name = name,
+                sendInPings = sendInPings,
+                disabled = disabled,
+                lifetime = lifetime,
+            ),
         )
 
         this.inner = when (subMetric) {
             is CounterMetricType -> LabeledCounter(meta, labels?.toList())
             is BooleanMetricType -> LabeledBoolean(meta, labels?.toList())
             is StringMetricType -> LabeledString(meta, labels?.toList())
-            else -> throw IllegalStateException(
-                "Can not create a labeled version of this metric type"
-            )
+            else -> error("Can not create a labeled version of this metric type")
         }
     }
 
@@ -77,9 +77,7 @@ class LabeledMetricType<T>(
             is LabeledCounter -> this.inner.get(label) as T
             is LabeledBoolean -> this.inner.get(label) as T
             is LabeledString -> this.inner.get(label) as T
-            else -> throw IllegalStateException(
-                "Can not create a labeled version of this metric type"
-            )
+            else -> error("Can not create a labeled version of this metric type")
         }
     }
 
@@ -116,9 +114,7 @@ class LabeledMetricType<T>(
             is LabeledCounter -> this.inner.testGetNumRecordedErrors(errorType)
             is LabeledBoolean -> this.inner.testGetNumRecordedErrors(errorType)
             is LabeledString -> this.inner.testGetNumRecordedErrors(errorType)
-            else -> throw IllegalStateException(
-                "Can not create a labeled version of this metric type"
-            )
+            else -> error("Can not create a labeled version of this metric type")
         }
     }
 }

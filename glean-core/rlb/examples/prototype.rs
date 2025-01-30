@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use once_cell::sync::Lazy;
 use tempfile::Builder;
 
-use glean::{private::PingType, ClientInfoMetrics, Configuration};
+use glean::{private::PingType, ClientInfoMetrics, ConfigurationBuilder};
 
 pub mod glean_metrics {
     use glean::{private::BooleanMetric, CommonMetricData, Lifetime};
@@ -28,8 +28,19 @@ pub mod glean_metrics {
 }
 
 #[allow(non_upper_case_globals)]
-pub static PrototypePing: Lazy<PingType> =
-    Lazy::new(|| PingType::new("prototype", true, true, vec![]));
+pub static PrototypePing: Lazy<PingType> = Lazy::new(|| {
+    PingType::new(
+        "prototype",
+        true,
+        true,
+        true,
+        true,
+        true,
+        vec![],
+        vec![],
+        true,
+    )
+});
 
 fn main() {
     env_logger::init();
@@ -43,21 +54,17 @@ fn main() {
         root.path().to_path_buf()
     };
 
-    let cfg = Configuration {
-        data_path,
-        application_id: "org.mozilla.glean_core.example".into(),
-        upload_enabled: true,
-        max_events: None,
-        delay_ping_lifetime_io: false,
-        server_endpoint: Some("invalid-test-host".into()),
-        uploader: None,
-        use_core_mps: true,
-    };
+    _ = &*PrototypePing;
+    let cfg = ConfigurationBuilder::new(true, data_path, "org.mozilla.glean_core.example")
+        .with_server_endpoint("invalid-test-host")
+        .with_use_core_mps(true)
+        .build();
 
     let client_info = ClientInfoMetrics {
         app_build: env!("CARGO_PKG_VERSION").to_string(),
         app_display_version: env!("CARGO_PKG_VERSION").to_string(),
         channel: None,
+        locale: None,
     };
 
     glean::initialize(cfg, client_info);

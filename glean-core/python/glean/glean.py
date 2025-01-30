@@ -6,7 +6,6 @@
 The main Glean general API.
 """
 
-
 import atexit
 import logging
 from pathlib import Path
@@ -49,19 +48,20 @@ class OnGleanEventsImpl(_uniffi.OnGleanEvents):
     def __init__(self, glean):
         self.glean = glean
 
-    def on_initialize_finished(self):
-        log.debug("OnGleanEventsImpl.on_initialize_finished")
+    def initialize_finished(self):
         self.glean._init_finished = True
 
     def trigger_upload(self):
-        log.debug("OnGleanEventsImpl.trigger_upload")
         PingUploadWorker.process(Glean._testing_mode)
 
     def start_metrics_ping_scheduler(self):
-        log.debug("OnGleanEventsImpl.start_metrics_ping_scheduler")
+        pass
 
     def cancel_uploads(self):
-        log.debug("OnGleanEventsImpl.cancel_uploads")
+        pass
+
+    def shutdown(self):
+        pass
 
 
 class Glean:
@@ -216,6 +216,7 @@ class Glean:
             device_manufacturer=None,
             device_model=None,
             android_sdk_version=None,
+            windows_build_number=None,
         )
         callbacks = OnGleanEventsImpl(cls)
         cfg = _uniffi.InternalConfiguration(
@@ -227,6 +228,15 @@ class Glean:
             delay_ping_lifetime_io=False,
             use_core_mps=False,
             app_build=cls._application_build_id,
+            trim_data_to_registered_pings=False,
+            log_level=None,
+            rate_limit=None,
+            enable_event_timestamps=configuration.enable_event_timestamps,
+            experimentation_id=configuration.experimentation_id,
+            enable_internal_pings=configuration.enable_internal_pings,
+            ping_schedule={},
+            ping_lifetime_threshold=0,
+            ping_lifetime_max_time=0,
         )
 
         _uniffi.glean_initialize(cfg, client_info, callbacks)
@@ -315,7 +325,7 @@ class Glean:
     @classmethod
     def set_upload_enabled(cls, enabled: bool) -> None:
         """
-        Enable or disable Glean collection and upload.
+        **DEPRECATED** Enable or disable Glean collection and upload.
 
         Metric collection is enabled by default.
 
@@ -325,6 +335,9 @@ class Glean:
         When disabling, all pending metrics, events and queued pings are cleared.
 
         When enabling, the core Glean metrics are recreated.
+
+        **DEPRECATION NOTICE**:
+        This API is deprecated. Use `set_collection_enabled` instead.
 
         Args:
             enabled (bool): When True, enable metric collection.
@@ -336,6 +349,27 @@ class Glean:
         # Because the dispatch queue is halted until Glean is fully initialized
         # we can safely enqueue here and it will execute after initialization.
         _uniffi.glean_set_upload_enabled(enabled)
+
+    @classmethod
+    def set_collection_enabled(cls, enabled: bool) -> None:
+        """
+        Enable or disable Glean collection and upload.
+
+        Metric collection is enabled by default.
+
+        When collection is disabled, metrics aren't recorded at all and no data
+        is uploaded.
+        **Note**: Individual pings can be enabled if they don't follow this setting.
+        See `PingType.set_enabled`.
+
+        When disabling, all pending metrics, events and queued pings are cleared.
+
+        When enabling, the core Glean metrics are recreated.
+
+        Args:
+            enabled (bool): When True, enable metric collection.
+        """
+        cls.set_upload_enabled(enabled)
 
     @classmethod
     def set_experiment_active(
@@ -399,6 +433,31 @@ class Glean:
             raise RuntimeError("Experiment data is not set")
 
     @classmethod
+    def set_experimentation_id(cls, experimentation_id: str):
+        """
+        Dynamically set the experimentation identifier, as opposed to setting it through
+        the configuration during initialization.
+
+        Args:
+            experimentation_id (str): The string experimentation identifier to set
+        """
+        _uniffi.glean_set_experimentation_id(experimentation_id)
+
+    @classmethod
+    def test_get_experimentation_id(cls) -> str:
+        """
+        Returns the stored experimentation id, for testing purposes only.
+
+        Returns:
+            experimentation_id (str): The experimentation id set by the client.
+        """
+        experimentation_id = _uniffi.glean_test_get_experimentation_id()
+        if experimentation_id is not None:
+            return experimentation_id
+        else:
+            raise RuntimeError("Experimentation id is not set")
+
+    @classmethod
     def handle_client_active(cls):
         """
         Performs the collection/cleanup operations required by becoming active.
@@ -421,6 +480,17 @@ class Glean:
         getting to background).
         """
         _uniffi.glean_handle_client_inactive()
+
+    @classmethod
+    def shutdown(cls):
+        """
+        Shuts down Glean in an orderly fashion.
+        """
+        _uniffi.glean_shutdown()
+
+        # On top of the Glean shutdown
+        # we also wait for the process dispatcher to finish.
+        ProcessDispatcher._wait_for_last_process()
 
 
 __all__ = ["Glean"]

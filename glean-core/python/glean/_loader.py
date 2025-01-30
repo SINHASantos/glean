@@ -8,8 +8,8 @@ Utilities for loading metrics.yaml and pings.yaml files and creating a tree
 of metric types.
 """
 
-
 import enum
+from dataclasses import field, make_dataclass
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union
 
@@ -34,13 +34,14 @@ _TYPE_MAPPING = {
     "labeled_counter": metrics.LabeledCounterMetricType,
     "labeled_string": metrics.LabeledStringMetricType,
     "memory_distribution": metrics.MemoryDistributionMetricType,
+    "object": metrics.ObjectMetricType,
     "ping": metrics.PingType,
+    "quantity": metrics.QuantityMetricType,
     "string": metrics.StringMetricType,
     "string_list": metrics.StringListMetricType,
     "timespan": metrics.TimespanMetricType,
     "timing_distribution": metrics.TimingDistributionMetricType,
     "uuid": metrics.UuidMetricType,
-    "quantity": metrics.QuantityMetricType,
 }
 
 
@@ -60,6 +61,11 @@ _ARGS = [
     "range_min",
     "reason_codes",
     "send_in_pings",
+    "precise_timestamps",
+    "include_info_sections",
+    "schedules_pings",
+    "enabled",
+    "follows_collection_enabled",
     "time_unit",
 ]
 
@@ -136,9 +142,7 @@ def _event_extra_factory(name: str, argnames: List[Tuple[str, str]]) -> Any:
         for key, value in kwargs.items():
             typ = next((t for (k, t) in argnames if key == k), None)
             if typ is None:
-                raise TypeError(
-                    f"Argument '{key}' not valid for {self.__class__.__name__}"
-                )
+                raise TypeError(f"Argument '{key}' not valid for {self.__class__.__name__}")
             elif typ == "boolean" and isinstance(value, bool):
                 pass
             elif typ == "string" and isinstance(value, str):
@@ -146,9 +150,7 @@ def _event_extra_factory(name: str, argnames: List[Tuple[str, str]]) -> Any:
             elif typ == "quantity" and isinstance(value, int):
                 pass
             else:
-                raise TypeError(
-                    f"Field '{key}' requires type {typ} in {self.__class__.__name__}"
-                )
+                raise TypeError(f"Field '{key}' requires type {typ} in {self.__class__.__name__}")
             setattr(self, key, value)
 
     def to_ffi_extra(self):
@@ -175,6 +177,61 @@ def _event_extra_factory(name: str, argnames: List[Tuple[str, str]]) -> Any:
     attr["to_ffi_extra"] = to_ffi_extra
     newclass = type(name, (metrics.EventExtras,), attr)
     return newclass
+
+
+def _struct_type(typ) -> type:
+    if typ == "boolean":
+        return bool
+    elif typ == "string":
+        return str
+    elif typ == "number":
+        return int
+    else:
+        raise ValueError(f"Unsupported struct type '{typ}'")
+
+
+def _object_factory(
+    name: str, structure: Dict[str, Any]
+) -> Generator[Tuple[str, type], None, None]:
+    """
+    Generate new classes, inheriting from `metrics.ObjectSerialize`
+    and implementing the `into_serialized_object` method,
+    which serializes objects into JSON.
+    """
+
+    if structure["type"] == "array":
+        newclass = type(
+            name,
+            (
+                list,
+                metrics.ObjectSerialize,
+            ),
+            {},
+        )
+        yield (name, newclass)
+        yield from _object_factory(f"{name}Item", structure["items"])
+    elif structure["type"] == "object":
+        fields = []  # list[tuple[str, type, Any]]
+        for itemname, val in structure["properties"].items():
+            if val["type"] == "object":
+                fct = _object_factory(f"{name}Item{Camelize(itemname)}Object", val)
+                n, ty = next(fct)
+                yield n, ty
+                yield from fct
+                fields.append((itemname, ty, field(default=None)))
+            elif val["type"] == "array":
+                fct = _object_factory(f"{name}Item{Camelize(itemname)}", val)
+                n, ty = next(fct)
+                yield n, ty
+                yield from fct
+                fields.append((itemname, ty, field(default=None)))
+            else:
+                fields.append((itemname, _struct_type(val["type"]), field(default=None)))
+        newclass = make_dataclass(name, fields, bases=(metrics.ObjectSerialize,))
+        yield (name, newclass)
+    else:
+        ty = structure["type"]
+        raise ValueError(f"Unsupported object type '{ty}'")
 
 
 def _split_ctor_args(args: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
@@ -208,12 +265,29 @@ def _get_metric_objects(
     elif metric.type == "ping":
         # Special-case Ping, doesn't take CommonMetricData
         glean_metric = metrics.PingType(**args)  # type: ignore
+    elif metric.type == "object":
+        # Special-case object metric, it needs the type
+        class_name = name + "_object"
+        class_name = Camelize(class_name)
+
+        obj_cls = None
+        for cls_name, cls in _object_factory(class_name, metric._generate_structure):
+            yield cls_name, cls
+            if obj_cls is None:
+                obj_cls = cls
+
+        glean_metric = metrics.ObjectMetricType(metrics.CommonMetricData(**args), obj_cls)  # type: ignore
     else:
         # Hack for the time being.
         if "dynamic_label" not in args:
             args["dynamic_label"] = None
         meta_args, rest = _split_ctor_args(args)
-        glean_metric = metric_type(metrics.CommonMetricData(**meta_args), **rest)
+        if getattr(metric, "labeled", False):
+            glean_metric = metric_type(
+                metrics.LabeledMetricData.COMMON(metrics.CommonMetricData(**meta_args)), **rest
+            )
+        else:
+            glean_metric = metric_type(metrics.CommonMetricData(**meta_args), **rest)
 
     glean_metric.__doc__ = metric.description
 
@@ -221,12 +295,10 @@ def _get_metric_objects(
 
     # Events and Pings also need to define an enumeration
     if metric.type == "event":
-        print(f"Event metric {metric.name} looking for extras")
         class_name = name + "_extra"
         class_name = Camelize(class_name)
         values = metric.allowed_extra_keys_with_types
         keys_class = _event_extra_factory(class_name, values)  # type: ignore
-        print(f"Event metric {metric.name} has extras {values} in {keys_class}")
         yield class_name, keys_class
     elif metric.type == "ping":
         enum_name = name + "_reason_codes"

@@ -9,6 +9,7 @@ import XCTest
 
 private typealias GleanInternalMetrics = GleanMetrics.GleanInternalMetrics
 
+// swiftlint:disable type_body_length
 class GleanTests: XCTestCase {
     var expectation: XCTestExpectation?
 
@@ -102,6 +103,25 @@ class GleanTests: XCTestCase {
         )
     }
 
+    func testGleanExperimentationIdIsSet() {
+        Glean.shared.resetGlean(
+            configuration: Configuration(
+                maxEvents: nil,
+                channel: nil,
+                serverEndpoint: nil,
+                dataPath: nil,
+                logLevel: nil,
+                enableEventTimestamps: true,
+                experimentationId: "alpha-beta-gamma-delta"
+            ),
+            clearStores: true)
+        XCTAssertEqual(
+            "alpha-beta-gamma-delta",
+            Glean.shared.testGetExperimentationId()!,
+            "Experimenatation ids must match"
+        )
+    }
+
     func testGleanIsNotInitializedFromOtherProcesses() {
         // Check to see if Glean is initialized
         XCTAssert(Glean.shared.isInitialized())
@@ -159,9 +179,9 @@ class GleanTests: XCTestCase {
             }
 
             return HTTPStubsResponse(
-                jsonObject: [],
+                data: Data("OK".utf8),
                 statusCode: 200,
-                headers: ["Content-Type": "application/json"]
+                headers: nil
             )
         }
 
@@ -197,9 +217,9 @@ class GleanTests: XCTestCase {
             }
 
             return HTTPStubsResponse(
-                jsonObject: [],
+                data: Data("OK".utf8),
                 statusCode: 200,
-                headers: ["Content-Type": "application/json"]
+                headers: nil
             )
         }
 
@@ -237,7 +257,12 @@ class GleanTests: XCTestCase {
             name: "custom",
             includeClientId: true,
             sendIfEmpty: false,
-            reasonCodes: []
+            preciseTimestamps: true,
+            includeInfoSections: true,
+            enabled: true,
+            schedulesPings: [],
+            reasonCodes: [],
+            followsCollectionEnabled: true
         )
 
         let counter = CounterMetricType(CommonMetricData(
@@ -259,7 +284,7 @@ class GleanTests: XCTestCase {
         Glean.shared.resetGlean(clearStores: false)
 
         // Glean might still be initializing. Disable upload.
-        Glean.shared.setUploadEnabled(false)
+        Glean.shared.setCollectionEnabled(false)
 
         // Set data and try to submit a custom ping.
         counter.add(1)
@@ -270,9 +295,39 @@ class GleanTests: XCTestCase {
         }
     }
 
+    func testSettingRemoteMetricConfiguration() {
+        let counter = CounterMetricType(CommonMetricData(
+            category: "telemetry",
+            name: "counter_metric",
+            sendInPings: ["custom"],
+            lifetime: .application,
+            disabled: true
+        ))
+
+        // Set a metric configuration that enables telemetry.counter_metric
+        let metricConfigStringifiedJson =
+"""
+{
+  "metrics_enabled": {
+    "telemetry.counter_metric": true
+  }
+}
+"""
+        Glean.shared.applyServerKnobsConfig(metricConfigStringifiedJson)
+
+        // Attempt to add to the counter, this should succeed.
+        counter.add(1)
+        if let value = counter.testGetValue() {
+            XCTAssertEqual(1, value)
+        } else {
+            XCTAssert(false, "Failed to set metric config to enable counter")
+        }
+    }
+
     func testForegroundCounter() {
-        // Glean is started by the test framework.
-        // That already triggers the first foreground event.
+        // Reset Glean to ensure that this isn't affected by concurrent tests
+        // This will trigger the initial "foreground" event
+        resetGleanDiscardingInitialPings(testCase: self, tag: "GleanTests")
 
         // Put it in the background
         Glean.shared.handleBackgroundEvent()
@@ -294,4 +349,92 @@ class GleanTests: XCTestCase {
             GleanInternalMetrics.buildDate.testGetValue()
         )
     }
+
+    func testGleanDoesNotInitializeWithInvalidDbPath() {
+        Glean.shared.testDestroyGleanHandle()
+
+        // The path provided here is invalid because it is an empty string.
+        let cfg = Configuration(dataPath: "")
+        Glean.shared.initialize(uploadEnabled: true, configuration: cfg, buildInfo: stubBuildInfo())
+
+        // Since the path is invalid, Glean should not properly initialize.
+        XCTAssertFalse(Glean.shared.isInitialized())
+    }
+
+    func testGleanIsCustomDataPathIsSetCorrectly() {
+        // Initialize with a custom data path and ensure `isCustomDataPath` is true.
+        Glean.shared.testDestroyGleanHandle()
+        let cfg = Configuration(dataPath: "glean_test")
+        Glean.shared.initialize(uploadEnabled: true, configuration: cfg, buildInfo: stubBuildInfo())
+        XCTAssertTrue(Glean.shared.isCustomDataPath)
+
+        // Initialize without a custom data path and ensure `isCustomDataPath` is false.
+        Glean.shared.testDestroyGleanHandle()
+        Glean.shared.initialize(uploadEnabled: true, buildInfo: stubBuildInfo())
+        XCTAssertFalse(Glean.shared.isCustomDataPath)
+    }
+
+    func testShutdown() {
+        // This test relies on Glean not being initialized
+        Glean.shared.testDestroyGleanHandle()
+
+        // We expect 10 pings later
+        stubServerReceive { pingType, _ in
+            if pingType == "baseline" {
+                // Ignore initial "active" baseline ping
+                return
+            }
+
+            XCTAssertEqual("custom", pingType)
+
+            // Fulfill test's expectation once we parsed the incoming data.
+            DispatchQueue.main.async {
+                // Let the response get processed before we mark the expectation fulfilled
+                self.expectation?.fulfill()
+            }
+        }
+
+        let customPing = Ping<NoReasonCodes>(
+            name: "custom",
+            includeClientId: true,
+            sendIfEmpty: false,
+            preciseTimestamps: true,
+            includeInfoSections: true,
+            enabled: true,
+            schedulesPings: [],
+            reasonCodes: [],
+            followsCollectionEnabled: true
+        )
+
+        let counter = CounterMetricType(CommonMetricData(
+            category: "telemetry",
+            name: "counter_metric",
+            sendInPings: ["custom"],
+            lifetime: .application,
+            disabled: false
+        ))
+
+        expectation = expectation(description: "Completed upload")
+        expectation?.expectedFulfillmentCount = 10
+
+        // Set the last time the "metrics" ping was sent to now. This is required for us to not
+        // send a metrics pings the first time we initialize Glean and to keep it from interfering
+        // with these tests.
+        let now = Date()
+        MetricsPingScheduler(true).updateSentDate(now)
+        // Restart glean
+        Glean.shared.resetGlean(clearStores: false)
+
+        // Set data and try to submit a custom ping 10x.
+        for _ in (0..<10) {
+            counter.add(1)
+            customPing.submit()
+        }
+
+        Glean.shared.shutdown()
+        waitForExpectations(timeout: 5.0) { error in
+            XCTAssertNil(error, "Test timed out waiting for upload: \(error!)")
+        }
+    }
 }
+// swiftlint:enable type_body_length

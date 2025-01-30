@@ -5,19 +5,21 @@
 from glean import Glean
 from glean import __version__ as glean_version
 from glean import metrics
-from glean.metrics import Lifetime, CommonMetricData
+from glean.metrics import Lifetime, CommonMetricData, LabeledMetricData
 from glean.testing import ErrorType
 
 
 def test_labeled_counter_type(ping_schema_url):
     labeled_counter_metric = metrics.LabeledCounterMetricType(
-        CommonMetricData(
-            disabled=False,
-            category="telemetry",
-            lifetime=Lifetime.APPLICATION,
-            name="labeled_counter_metric",
-            send_in_pings=["metrics"],
-            dynamic_label=None,
+        LabeledMetricData.COMMON(
+            CommonMetricData(
+                disabled=False,
+                category="telemetry",
+                lifetime=Lifetime.APPLICATION,
+                name="labeled_counter_metric",
+                send_in_pings=["metrics"],
+                dynamic_label=None,
+            )
         )
     )
 
@@ -31,13 +33,15 @@ def test_labeled_counter_type(ping_schema_url):
 
 def test_labeled_boolean_type(ping_schema_url):
     labeled_boolean_metric = metrics.LabeledBooleanMetricType(
-        CommonMetricData(
-            disabled=False,
-            category="telemetry",
-            lifetime=Lifetime.APPLICATION,
-            name="labeled_boolean_metric",
-            send_in_pings=["metrics"],
-            dynamic_label=None,
+        LabeledMetricData.COMMON(
+            CommonMetricData(
+                disabled=False,
+                category="telemetry",
+                lifetime=Lifetime.APPLICATION,
+                name="labeled_boolean_metric",
+                send_in_pings=["metrics"],
+                dynamic_label=None,
+            )
         )
     )
 
@@ -51,13 +55,15 @@ def test_labeled_boolean_type(ping_schema_url):
 
 def test_labeled_string_type(ping_schema_url):
     labeled_string_metric = metrics.LabeledStringMetricType(
-        CommonMetricData(
-            disabled=False,
-            category="telemetry",
-            lifetime=Lifetime.APPLICATION,
-            name="labeled_string_metric",
-            send_in_pings=["metrics"],
-            dynamic_label=None,
+        LabeledMetricData.COMMON(
+            CommonMetricData(
+                disabled=False,
+                category="telemetry",
+                lifetime=Lifetime.APPLICATION,
+                name="labeled_string_metric",
+                send_in_pings=["metrics"],
+                dynamic_label=None,
+            )
         )
     )
 
@@ -71,13 +77,15 @@ def test_labeled_string_type(ping_schema_url):
 
 def test_other_label_with_predefined_labels(ping_schema_url):
     labeled_counter_metric = metrics.LabeledCounterMetricType(
-        CommonMetricData(
-            disabled=False,
-            category="telemetry",
-            lifetime=Lifetime.APPLICATION,
-            name="labeled_counter_metric",
-            send_in_pings=["metrics"],
-            dynamic_label=None,
+        LabeledMetricData.COMMON(
+            CommonMetricData(
+                disabled=False,
+                category="telemetry",
+                lifetime=Lifetime.APPLICATION,
+                name="labeled_counter_metric",
+                send_in_pings=["metrics"],
+                dynamic_label=None,
+            )
         ),
         labels=["foo", "bar", "baz"],
     )
@@ -97,13 +105,15 @@ def test_other_label_with_predefined_labels(ping_schema_url):
 
 def test_other_label_without_predefined_labels(ping_schema_url):
     labeled_counter_metric = metrics.LabeledCounterMetricType(
-        CommonMetricData(
-            disabled=False,
-            category="telemetry",
-            lifetime=Lifetime.APPLICATION,
-            name="labeled_counter_metric",
-            send_in_pings=["metrics"],
-            dynamic_label=None,
+        LabeledMetricData.COMMON(
+            CommonMetricData(
+                disabled=False,
+                category="telemetry",
+                lifetime=Lifetime.APPLICATION,
+                name="labeled_counter_metric",
+                send_in_pings=["metrics"],
+                dynamic_label=None,
+            )
         )
     )
 
@@ -120,13 +130,15 @@ def test_other_label_without_predefined_labels(ping_schema_url):
 
 def test_other_label_without_predefined_labels_before_glean_init():
     labeled_counter_metric = metrics.LabeledCounterMetricType(
-        CommonMetricData(
-            disabled=False,
-            category="telemetry",
-            lifetime=Lifetime.APPLICATION,
-            name="labeled_counter_metric",
-            send_in_pings=["metrics"],
-            dynamic_label=None,
+        LabeledMetricData.COMMON(
+            CommonMetricData(
+                disabled=False,
+                category="telemetry",
+                lifetime=Lifetime.APPLICATION,
+                name="labeled_counter_metric",
+                send_in_pings=["metrics"],
+                dynamic_label=None,
+            )
         )
     )
 
@@ -150,24 +162,32 @@ def test_other_label_without_predefined_labels_before_glean_init():
 
 def test_invalid_labels_go_to_other():
     labeled_counter_metric = metrics.LabeledCounterMetricType(
-        CommonMetricData(
-            disabled=False,
-            category="telemetry",
-            lifetime=Lifetime.APPLICATION,
-            name="labeled_counter_metric",
-            send_in_pings=["metrics"],
-            dynamic_label=None,
+        LabeledMetricData.COMMON(
+            CommonMetricData(
+                disabled=False,
+                category="telemetry",
+                lifetime=Lifetime.APPLICATION,
+                name="labeled_counter_metric",
+                send_in_pings=["metrics"],
+                dynamic_label=None,
+            )
         )
     )
 
+    # These are actually fine now.
     labeled_counter_metric["notSnakeCase"].add(1)
     labeled_counter_metric[""].add(1)
     labeled_counter_metric["with/slash"].add(1)
     labeled_counter_metric["this_string_has_more_than_thirty_characters"].add(1)
 
-    assert 4 == labeled_counter_metric.test_get_num_recorded_errors(
-        ErrorType.INVALID_LABEL
-    )
+    assert 0 == labeled_counter_metric.test_get_num_recorded_errors(ErrorType.INVALID_LABEL)
+
+    # Longer than 71? Nope.
+    labeled_counter_metric["1" * 72].add(1)
+    # Non-ASCII? Nope.
+    labeled_counter_metric["Â møøse"].add(1)
+
+    assert 2 == labeled_counter_metric.test_get_num_recorded_errors(ErrorType.INVALID_LABEL)
 
 
 def test_rapidly_recreating_labeled_metrics_does_not_crash():
@@ -180,13 +200,15 @@ def test_rapidly_recreating_labeled_metrics_does_not_crash():
     """
 
     labeled_counter_metric = metrics.LabeledCounterMetricType(
-        CommonMetricData(
-            category="telemetry",
-            name="labeled_nocrash",
-            send_in_pings=["metrics"],
-            lifetime=Lifetime.APPLICATION,
-            disabled=False,
-            dynamic_label=None,
+        LabeledMetricData.COMMON(
+            CommonMetricData(
+                category="telemetry",
+                name="labeled_nocrash",
+                send_in_pings=["metrics"],
+                lifetime=Lifetime.APPLICATION,
+                disabled=False,
+                dynamic_label=None,
+            )
         ),
         labels=["foo"],
     )

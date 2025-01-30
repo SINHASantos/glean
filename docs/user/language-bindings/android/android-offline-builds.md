@@ -6,9 +6,17 @@ The Glean Kotlin SDK uses a Python script, [`glean_parser`](https://github.com/m
 
 For offline builds, the Python environment, and packages of `glean_parser` and its dependencies must be provided prior to building the Glean-using application.
 
-To build a Glean-using application in offline mode, do the following:
+To build a Glean-using application in offline mode, you can either:
 
-- Install Python 3.6 or later and ensure it's on the `PATH`.
+### Provide an externally-managed virtualenv
+
+Set `ext.gleanPythonEnvDir` to your existing virtualenv before applying the plugin, see [`gleanPythonEnvDir`](./android-build-configuration-options.md#gleanpythonenvdir).
+
+### Provide a Python interpreter and the required wheels
+
+In this mode Glean will setup its own virtualenv in `$gradleUserHomeDir/glean`, controlled by the `GLEAN_PYTHON` and `GLEAN_PYTHON_WHEELS_DIR` environment variables.
+
+- Install Python 3.8 or later and ensure it's on the `PATH`.
 
   - On Linux, installing Python from your Linux distribution's package manager is usually sufficient.
 

@@ -10,7 +10,7 @@
 
 mod common;
 
-use glean::Configuration;
+use glean::ConfigurationBuilder;
 
 /// Some user metrics.
 mod metrics {
@@ -54,6 +54,7 @@ mod metrics {
 /// The pre-init dispatcher queue records how many recordings over the limit it saw.
 ///
 /// This is an integration test to avoid dealing with resetting the dispatcher.
+#[ignore] // oops, long running test see Bug 1911350 for more info
 #[test]
 fn overflowing_the_task_queue_records_telemetry() {
     common::enable_test_logging();
@@ -62,26 +63,19 @@ fn overflowing_the_task_queue_records_telemetry() {
     let dir = tempfile::tempdir().unwrap();
     let tmpname = dir.path().to_path_buf();
 
-    let cfg = Configuration {
-        data_path: tmpname,
-        application_id: "firefox-desktop".into(),
-        upload_enabled: true,
-        max_events: None,
-        delay_ping_lifetime_io: false,
-        server_endpoint: Some("invalid-test-host".into()),
-        uploader: None,
-        use_core_mps: false,
-    };
+    let cfg = ConfigurationBuilder::new(true, tmpname, "firefox-desktop")
+        .with_server_endpoint("invalid-test-host")
+        .build();
 
     // Insert a bunch of tasks to overflow the queue.
-    for _ in 0..1010 {
+    for _ in 0..1000010 {
         metrics::rapid_counting.add(1);
     }
 
     // Now initialize Glean
     common::initialize(cfg);
 
-    assert_eq!(Some(1000), metrics::rapid_counting.test_get_value(None));
+    assert_eq!(Some(1000000), metrics::rapid_counting.test_get_value(None));
 
     // The metrics counts the total number of overflowing tasks,
     // (and the count of tasks in the queue when we overflowed: bug 1764573)

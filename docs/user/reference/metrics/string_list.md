@@ -77,7 +77,7 @@ Glean.search.engines.add("duck duck go");
 **C++**
 
 ```cpp
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/SearchMetrics.h"
 
 mozilla::glean::search::engines.Add("wikipedia"_ns);
 mozilla::glean::search::engines.Add("duck duck go"_ns);
@@ -101,12 +101,13 @@ Glean.search.engines.add("duck duck go");
 
 #### Limits
 
-* Fixed maximum string length: 50. Longer strings are truncated. This is measured in the number of bytes when the string is encoded in UTF-8.
-* Fixed maximum list length: 20 items. Additional strings are dropped.
+* Fixed maximum string length: 100. Longer strings are truncated. This is measured in the number of bytes when the string is encoded in UTF-8.
+* Fixed maximum list length: 100 items. Additional strings are dropped.
 
 ### `set`
 
 Set the metric to a specific list of strings.
+An empty list is accepted.
 
 {{#include ../../../shared/tab_header.md}}
 <div data-lang="Kotlin" class="tab">
@@ -165,7 +166,7 @@ Glean.search.engines.set(["wikipedia", "duck duck go"]);
 **C++**
 
 ```cpp
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/SearchMetrics.h"
 
 mozilla::glean::search::engines.Set({"wikipedia"_ns, "duck duck go"_ns});
 ```
@@ -181,14 +182,14 @@ Glean.search.engines.set(["wikipedia", "duck duck go"]);
 
 #### Recorded errors
 
-* `invalid_overflow`: if the string is too long. (Prior to Glean 31.5.0, this recorded an `invalid_value`).
-* `invalid_value`: if the list is too long.
+* [`invalid_overflow`](../../user/metrics/error-reporting.md): if any string in the list is too long, see [Limits](#limits-1) below. (Prior to Glean 31.5.0, this recorded an `invalid_value`).
+* [`invalid_value`](../../user/metrics/error-reporting.md): if the list is too long, see [Limits](#limits-1) below.
 * [`invalid_type`](../../user/metrics/error-reporting.md): if a non-string array is given.
 
 #### Limits
 
-* Fixed maximum string length: 50. Longer strings are truncated. This is measured in the number of bytes when the string is encoded in UTF-8.
-* Fixed maximum list length: 20 items. Additional strings are dropped.
+* Fixed maximum string length: 100. Longer strings are truncated. This is measured in the number of bytes when the string is encoded in UTF-8.
+* Fixed maximum list length: 100 items. Additional strings are dropped.
 
 ## Testing API
 
@@ -197,6 +198,8 @@ Glean.search.engines.set(["wikipedia", "duck duck go"]);
 Gets the recorded value for a given string list metric.  
 Returns the list of strings if data is stored.  
 Returns a language-specific empty/null value if no data is stored.
+Has an optional argument to specify the name of the ping you wish to retrieve data from, except
+in Rust where it's required. `None` or no argument will default to the first value found for `send_in_pings`.
 
 {{#include ../../../shared/tab_header.md}}
 <div data-lang="Kotlin" class="tab">
@@ -264,7 +267,7 @@ Assert.ok(engines.includes("duck duck go"));
 **C++**
 
 ```cpp
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/SearchMetrics.h"
 
 ASSERT_EQUAL(mozilla::glean::search::engines.TestGetValue().isOk());
 nsTArray<nsCString> list = mozilla::glean::search::engines.TestGetValue().unwrap();
@@ -383,5 +386,5 @@ N/A
 ## Reference
 
 * [Swift API docs](../../../swift/Classes/StringListMetricType.html)
-* [Python API docs](../../../python/glean/metrics/string_list.html)
+* [Python API docs](../../../python/glean/metrics/index.html#glean.metrics.StringListMetric)
 * [Rust API docs](../../../docs/glean/private/struct.StringListMetric.html)

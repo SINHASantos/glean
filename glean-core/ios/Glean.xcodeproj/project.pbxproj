@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 52;
+	objectVersion = 54;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -56,16 +56,20 @@
 		BFFE18382350A5F50068D97B /* TimingDistributionMetric.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFFE18372350A5F50068D97B /* TimingDistributionMetric.swift */; };
 		BFFE183A2350A61F0068D97B /* TimingDistributionMetricTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFFE18392350A61F0068D97B /* TimingDistributionMetricTests.swift */; };
 		BFFE33AB232927C3005348FE /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFFE33AA232927C3005348FE /* Utils.swift */; };
+		C27E756329D4A67800C6AADD /* DataPathUtilsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C27E756229D4A67800C6AADD /* DataPathUtilsTests.swift */; };
 		CD062129284110970006370D /* TextMetric.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD062128284110970006370D /* TextMetric.swift */; };
+		CD07A4DE2BC808AE007A0F1C /* ObjectMetric.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD07A4DD2BC808AE007A0F1C /* ObjectMetric.swift */; };
 		CD0CADA427E216810015A997 /* glean.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDD08C8527E21104007C8400 /* glean.swift */; };
 		CD0F7CC026F0F27900EDA6A4 /* UrlMetric.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0F7CBF26F0F27900EDA6A4 /* UrlMetric.swift */; };
 		CD0F7CC226F0F28900EDA6A4 /* UrlMetricTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0F7CC126F0F28900EDA6A4 /* UrlMetricTests.swift */; };
+		CD3682F32CAC110300B02F04 /* RidealongPingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD3682F22CAC10FE00B02F04 /* RidealongPingTests.swift */; };
 		CD38786D271DCCC700C097D8 /* libglean_ffi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CD38786C271DCCC700C097D8 /* libglean_ffi.a */; };
 		CD70CF932850D69500FC2014 /* Gzip in Frameworks */ = {isa = PBXBuildFile; productRef = CD70CF922850D69500FC2014 /* Gzip */; };
 		CD70CF982850D77200FC2014 /* OHHTTPStubs in Frameworks */ = {isa = PBXBuildFile; productRef = CD70CF972850D77200FC2014 /* OHHTTPStubs */; };
 		CD70CF9A2850D79200FC2014 /* OHHTTPStubsSwift in Frameworks */ = {isa = PBXBuildFile; productRef = CD70CF992850D79200FC2014 /* OHHTTPStubsSwift */; };
 		CD81DCFA282A8F9B00347965 /* RateMetric.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD81DCF9282A8F9A00347965 /* RateMetric.swift */; };
 		CD81DCFC282A911400347965 /* RateMetricTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD81DCFB282A911400347965 /* RateMetricTests.swift */; };
+		CD9DA7852BC809BE00E18F31 /* ObjectMetricTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD9DA7842BC809BE00E18F31 /* ObjectMetricTests.swift */; };
 		CDBFB4DC27C3FA520045CCB9 /* Dispatchers.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDBFB4DB27C3FA520045CCB9 /* Dispatchers.swift */; };
 		CDD08C8627E21104007C8400 /* gleanFFI.h in Headers */ = {isa = PBXBuildFile; fileRef = CDD08C8427E21104007C8400 /* gleanFFI.h */; settings = {ATTRIBUTES = (Public, ); }; };
 /* End PBXBuildFile section */
@@ -136,13 +140,17 @@
 		BFFE18372350A5F50068D97B /* TimingDistributionMetric.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimingDistributionMetric.swift; sourceTree = "<group>"; };
 		BFFE18392350A61F0068D97B /* TimingDistributionMetricTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimingDistributionMetricTests.swift; sourceTree = "<group>"; };
 		BFFE33AA232927C3005348FE /* Utils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Utils.swift; sourceTree = "<group>"; };
+		C27E756229D4A67800C6AADD /* DataPathUtilsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataPathUtilsTests.swift; sourceTree = "<group>"; };
 		CD062128284110970006370D /* TextMetric.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TextMetric.swift; sourceTree = "<group>"; };
+		CD07A4DD2BC808AE007A0F1C /* ObjectMetric.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ObjectMetric.swift; sourceTree = "<group>"; };
 		CD0F7CBF26F0F27900EDA6A4 /* UrlMetric.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UrlMetric.swift; sourceTree = "<group>"; };
 		CD0F7CC126F0F28900EDA6A4 /* UrlMetricTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UrlMetricTests.swift; sourceTree = "<group>"; };
+		CD3682F22CAC10FE00B02F04 /* RidealongPingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RidealongPingTests.swift; sourceTree = "<group>"; };
 		CD387868271D9CD100C097D8 /* glean.udl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = glean.udl; path = ../../src/glean.udl; sourceTree = "<group>"; };
 		CD38786C271DCCC700C097D8 /* libglean_ffi.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libglean_ffi.a; path = ../../target/libglean_ffi.a; sourceTree = "<group>"; };
 		CD81DCF9282A8F9A00347965 /* RateMetric.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RateMetric.swift; sourceTree = "<group>"; };
 		CD81DCFB282A911400347965 /* RateMetricTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RateMetricTests.swift; sourceTree = "<group>"; };
+		CD9DA7842BC809BE00E18F31 /* ObjectMetricTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ObjectMetricTests.swift; sourceTree = "<group>"; };
 		CDBFB4DB27C3FA520045CCB9 /* Dispatchers.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Dispatchers.swift; sourceTree = "<group>"; };
 		CDD08C8427E21104007C8400 /* gleanFFI.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = gleanFFI.h; sourceTree = "<group>"; };
 		CDD08C8527E21104007C8400 /* glean.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = glean.swift; sourceTree = "<group>"; };
@@ -294,7 +302,7 @@
 		BF3DE39E2243A2F20018E23F /* GleanTests */ = {
 			isa = PBXGroup;
 			children = (
-				60691AEA28DD0BF200BDF31A /* BaselinePingTests.swift */,
+				C27E756429D4B56500C6AADD /* Utils */,
 				1F39E7B1239F0741009B13B3 /* Debug */,
 				1FB8F8392326EBA500618E47 /* Config */,
 				BF43A8CB232A613100545310 /* Metrics */,
@@ -310,6 +318,7 @@
 		BF43A8C5232A4B5F00545310 /* Metrics */ = {
 			isa = PBXGroup;
 			children = (
+				CD07A4DD2BC808AE007A0F1C /* ObjectMetric.swift */,
 				AC06529B26E032E300D92D5E /* QuantityMetric.swift */,
 				1F6A8FEF233C049D007837D5 /* BooleanMetric.swift */,
 				BF43A8C6232A4BA400545310 /* CounterMetric.swift */,
@@ -333,6 +342,7 @@
 		BF43A8CB232A613100545310 /* Metrics */ = {
 			isa = PBXGroup;
 			children = (
+				CD9DA7842BC809BE00E18F31 /* ObjectMetricTests.swift */,
 				AC06529D26E034BF00D92D5E /* QuantityMetricTypeTest.swift */,
 				1F6A8FF1233C068A007837D5 /* BooleanMetricTypeTest.swift */,
 				BF43A8CC232A615200545310 /* CounterMetricTests.swift */,
@@ -363,10 +373,20 @@
 		BF80AA5923992FFB00A8B172 /* Net */ = {
 			isa = PBXGroup;
 			children = (
+				60691AEA28DD0BF200BDF31A /* BaselinePingTests.swift */,
+				CD3682F22CAC10FE00B02F04 /* RidealongPingTests.swift */,
 				BF80AA5E2399305200A8B172 /* DeletionRequestPingTests.swift */,
 				BF80AA5A2399301200A8B172 /* HttpPingUploaderTests.swift */,
 			);
 			name = Net;
+			sourceTree = "<group>";
+		};
+		C27E756429D4B56500C6AADD /* Utils */ = {
+			isa = PBXGroup;
+			children = (
+				C27E756229D4A67800C6AADD /* DataPathUtilsTests.swift */,
+			);
+			path = Utils;
 			sourceTree = "<group>";
 		};
 		CDD08C8227E21069007C8400 /* uniffi */ = {
@@ -405,7 +425,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = BF3DE3A52243A2F20018E23F /* Build configuration list for PBXNativeTarget "Glean" */;
 			buildPhases = (
-				BF6F2DA5224BF2E000394062 /* Run Script */,
+				BF6F2DA5224BF2E000394062 /* Build Universal Library */,
 				BFB59A9723429FC000F40CA8 /* Run Glean SDK generator */,
 				CD0CADA527E216F40015A997 /* Run UniFFI bindgen */,
 				BF3DE38C2243A2F20018E23F /* Headers */,
@@ -508,7 +528,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		BF6F2DA5224BF2E000394062 /* Run Script */ = {
+		BF6F2DA5224BF2E000394062 /* Build Universal Library */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -517,7 +537,7 @@
 			);
 			inputPaths = (
 			);
-			name = "Run Script";
+			name = "Build Universal Library";
 			outputFileListPaths = (
 			);
 			outputPaths = (
@@ -566,7 +586,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ \"$ACTION\" = \"indexbuild\" ]; then\n  echo \"Skipping code generation in 'indexbuild' build. See https://bugzilla.mozilla.org/show_bug.cgi?id=1744504 for more info.\"\n  exit 0\nfi\nbash $PWD/../../build-scripts/xc-cargo.sh cargo run --package embedded-uniffi-bindgen -- generate $INPUT_FILE_PATH --language swift --out-dir $SRCROOT/Glean/Generated/uniffi --no-format $SCRIPT_INPUT_FILE_0\n";
+			shellScript = "if [ \"$ACTION\" = \"indexbuild\" ]; then\n  echo \"Skipping code generation in 'indexbuild' build. See https://bugzilla.mozilla.org/show_bug.cgi?id=1744504 for more info.\"\n  exit 0\nfi\nbash $PWD/../../build-scripts/xc-cargo.sh cargo run --package uniffi-bindgen -- generate $INPUT_FILE_PATH --language swift --out-dir $SRCROOT/Glean/Generated/uniffi --no-format $SCRIPT_INPUT_FILE_0\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -588,6 +608,7 @@
 				1FD4527523395B4500F4C7E8 /* UuidMetric.swift in Sources */,
 				CD81DCFA282A8F9B00347965 /* RateMetric.swift in Sources */,
 				BFE1CDC8233B73B30019EE47 /* Unreachable.swift in Sources */,
+				CD07A4DE2BC808AE007A0F1C /* ObjectMetric.swift in Sources */,
 				1F58920D23C7D615007D2D80 /* MetricsPingScheduler.swift in Sources */,
 				BF7CC0A62473F61C003B166D /* Metrics.swift in Sources */,
 				1FB70AEF23301C1D00C7CF09 /* Logger.swift in Sources */,
@@ -619,7 +640,9 @@
 				CD0F7CC226F0F28900EDA6A4 /* UrlMetricTests.swift in Sources */,
 				BFCBD6AB246D55CC0032096D /* TestUtils.swift in Sources */,
 				AC06529E26E034BF00D92D5E /* QuantityMetricTypeTest.swift in Sources */,
+				CD3682F32CAC110300B02F04 /* RidealongPingTests.swift in Sources */,
 				1F58921223C923C4007D2D80 /* MetricsPingSchedulerTests.swift in Sources */,
+				CD9DA7852BC809BE00E18F31 /* ObjectMetricTests.swift in Sources */,
 				1FD4527723395EEB00F4C7E8 /* UuidMetricTests.swift in Sources */,
 				BF80AA5B2399301300A8B172 /* HttpPingUploaderTests.swift in Sources */,
 				1FB8F8382326EABD00618E47 /* ConfigurationTests.swift in Sources */,
@@ -630,6 +653,7 @@
 				1F6A8FF2233C068A007837D5 /* BooleanMetricTypeTest.swift in Sources */,
 				BFE1CDC6233B6B6D0019EE47 /* LabeledMetricTests.swift in Sources */,
 				BF30FDC6233260C400840607 /* TimespanMetricTests.swift in Sources */,
+				C27E756329D4A67800C6AADD /* DataPathUtilsTests.swift in Sources */,
 				BF80AA5F2399305200A8B172 /* DeletionRequestPingTests.swift in Sources */,
 				BFFE183A2350A61F0068D97B /* TimingDistributionMetricTests.swift in Sources */,
 				BF3DE3A02243A2F20018E23F /* GleanTests.swift in Sources */,
@@ -701,7 +725,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -760,7 +784,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
@@ -788,6 +812,7 @@
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
 				INFOPLIST_FILE = Glean/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -824,6 +849,7 @@
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
 				INFOPLIST_FILE = Glean/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -853,6 +879,7 @@
 				DEVELOPMENT_TEAM = 99QSBDSJN4;
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
 				INFOPLIST_FILE = GleanTests/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -874,6 +901,7 @@
 				DEVELOPMENT_TEAM = 99QSBDSJN4;
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
 				INFOPLIST_FILE = GleanTests/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

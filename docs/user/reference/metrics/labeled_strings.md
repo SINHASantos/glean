@@ -67,7 +67,7 @@ login.errorsByStage["server_auth"].set("Invalid password");
 
 **C++**
 ```cpp
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/DomWebauthnMetrics.h"
 
 mozilla::glean::login::errors_by_stage.Get("server_auth"_ns).Set("Invalid password"_ns);
 ```
@@ -98,6 +98,8 @@ Glean.login.errorsByStage["server_auth"].set("Invalid password");
 Gets the recorded value for a given label in a labeled string metric.  
 Returns the string if data is stored.  
 Returns a language-specific empty/null value if no data is stored.
+Has an optional argument to specify the name of the ping you wish to retrieve data from, except
+in Rust where it's required. `None` or no argument will default to the first value found for `send_in_pings`.
 
 {{#include ../../../shared/tab_header.md}}
 
@@ -165,7 +167,7 @@ assert.strictEqual("Invalid password", await metrics.login.errorsByStage["server
 
 **C++**
 ```cpp
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/DomWebauthnMetrics.h"
 
 ASSERT_STREQ("Invalid password",
              mozilla::glean::login::errors_by_stage.Get("server_auth"_ns)
@@ -303,6 +305,5 @@ login:
 ## Reference
 
 * Swift API docs: [`LabeledMetricType`](../../../swift/Classes/LabeledMetricType.html), [`StringMetricType`](../../../swift/Classes/StringMetricType.html)
-* Python API docs: [`LabeledMetricBase`](../../../python/glean/metrics/labeled.html), [`StringMetricType`](../../../python/glean/metrics/string.html)
+* Python API docs: [`LabeledStringMetricType`](../../../python/glean/metrics/labeled.html#glean.metrics.labeled.LabeledStringMetricType), [`StringMetricType`](../../../python/glean/metrics/index.html#glean.metrics.StringMetricType)
 * Rust API docs: [`LabeledMetric`](../../../docs/glean/private/struct.LabeledMetric.html), [`StringMetricType`](../../../docs/glean/private/struct.StringMetric.html)
-* JavaScript API docs: [`LabeledMetricType`](https://mozilla.github.io/glean.js/classes/core_metrics_types_labeled.default.html), [`StringMetricType`](https://mozilla.github.io/glean.js/classes/core_metrics_types_string.default.html)

@@ -23,9 +23,7 @@ ROOT = Path(__file__).parent
 
 
 class ClickKeys(metrics.EventExtras):
-    def __init__(
-        self, object_id: Optional[str] = None, other: Optional[str] = None
-    ) -> None:
+    def __init__(self, object_id: Optional[str] = None, other: Optional[str] = None) -> None:
         self._object_id = object_id
         self._other = other
 
@@ -41,7 +39,6 @@ class ClickKeys(metrics.EventExtras):
 
 
 def test_the_api_records_to_its_storage_engine():
-
     click = metrics.EventMetricType(
         CommonMetricData(
             disabled=False,
@@ -80,7 +77,6 @@ def test_the_api_records_to_its_storage_engine():
 
 
 def test_the_api_records_to_its_storage_engine_when_category_is_empty():
-
     click = metrics.EventMetricType(
         CommonMetricData(
             disabled=False,
@@ -114,7 +110,6 @@ def test_the_api_records_to_its_storage_engine_when_category_is_empty():
 
 
 def test_disabled_events_must_not_record_data():
-
     click = metrics.EventMetricType(
         CommonMetricData(
             disabled=True,
@@ -305,7 +300,6 @@ def test_flush_queued_events_on_startup_and_correctly_handle_preinit_events(
 
 
 def test_long_extra_values_record_an_error():
-
     click = metrics.EventMetricType(
         CommonMetricData(
             disabled=False,
@@ -326,11 +320,8 @@ def test_long_extra_values_record_an_error():
 
 
 def test_event_enum_is_generated_correctly():
-    metrics = load_metrics(
-        ROOT.parent / "data" / "core.yaml", config={"allow_reserved": True}
-    )
+    metrics = load_metrics(ROOT.parent / "data" / "core.yaml", config={"allow_reserved": True})
 
-    print(dir(metrics.environment))
     metrics.environment.event_example.record(
         metrics.environment.EventExampleExtra(key1="value1", key2="value2")
     )
@@ -358,7 +349,6 @@ def test_event_extra_is_generated_correctly():
 
 
 def test_the_convenient_extrakeys_api():
-
     click = metrics.EventMetricType(
         CommonMetricData(
             disabled=False,
@@ -408,9 +398,7 @@ def test_event_extra_does_typechecks():
     metrics.core.PreferenceToggledExtra(preference="value1")
     metrics.core.PreferenceToggledExtra(enabled=True)
     metrics.core.PreferenceToggledExtra(swapped=1)
-    extras = metrics.core.PreferenceToggledExtra(
-        preference="value1", enabled=True, swapped=1
-    )
+    extras = metrics.core.PreferenceToggledExtra(preference="value1", enabled=True, swapped=1)
     # Check conversion to FFI types, extras are sorted by name
     ffi = extras.to_ffi_extra()
     expected = {

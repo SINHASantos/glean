@@ -8,12 +8,16 @@ use std::sync::{Arc, Mutex};
 
 use crate::common_metric_data::{CommonMetricData, CommonMetricDataInternal};
 use crate::error_recording::{record_error, test_get_num_recorded_errors, ErrorType};
-use crate::metrics::{BooleanMetric, CounterMetric, Metric, MetricType, StringMetric};
+use crate::histogram::HistogramType;
+use crate::metrics::{
+    BooleanMetric, CounterMetric, CustomDistributionMetric, MemoryDistributionMetric, MemoryUnit,
+    Metric, MetricType, QuantityMetric, StringMetric, TimeUnit, TimingDistributionMetric,
+};
 use crate::Glean;
 
 const MAX_LABELS: usize = 16;
 const OTHER_LABEL: &str = "__other__";
-const MAX_LABEL_LENGTH: usize = 61;
+const MAX_LABEL_LENGTH: usize = 71;
 
 /// A labeled counter.
 pub type LabeledCounter = LabeledMetric<CounterMetric>;
@@ -24,64 +28,47 @@ pub type LabeledBoolean = LabeledMetric<BooleanMetric>;
 /// A labeled string.
 pub type LabeledString = LabeledMetric<StringMetric>;
 
-/// Checks whether the given label is sane.
-///
-/// The check corresponds to the following regular expression:
-///
-/// ```text
-/// ^[a-z_][a-z0-9_-]{0,29}(\\.[a-z_][a-z0-9_-]{0,29})*$
-/// ```
-///
-/// We do a manul check here instead of using a regex,
-/// because the regex crate adds to the binary size significantly,
-/// and the Glean SDK doesn't use regular expressions anywhere else.
-///
-/// Some examples of good and bad labels:
-///
-/// Good:
-/// * `this.is.fine`
-/// * `this_is_fine_too`
-/// * `this.is_still_fine`
-/// * `thisisfine`
-/// * `_.is_fine`
-/// * `this.is-fine`
-/// * `this-is-fine`
-/// Bad:
-/// * `this.is.not_fine_due_tu_the_length_being_too_long_i_thing.i.guess`
-/// * `1.not_fine`
-/// * `this.$isnotfine`
-/// * `-.not_fine`
-fn matches_label_regex(value: &str) -> bool {
-    let mut iter = value.chars();
+/// A labeled custom_distribution.
+pub type LabeledCustomDistribution = LabeledMetric<CustomDistributionMetric>;
 
-    loop {
-        // Match the first letter in the word.
-        match iter.next() {
-            Some('_') | Some('a'..='z') => (),
-            _ => return false,
-        };
+/// A labeled memory_distribution.
+pub type LabeledMemoryDistribution = LabeledMetric<MemoryDistributionMetric>;
 
-        // Match subsequent letters in the word.
-        let mut count = 0;
-        loop {
-            match iter.next() {
-                // We are done, so the whole expression is valid.
-                None => return true,
-                // Valid characters.
-                Some('_') | Some('-') | Some('a'..='z') | Some('0'..='9') => (),
-                // We ended a word, so iterate over the outer loop again.
-                Some('.') => break,
-                // An invalid character
-                _ => return false,
-            }
-            count += 1;
-            // We allow 30 characters per word, but the first one is handled
-            // above outside of this loop, so we have a maximum of 29 here.
-            if count == 29 {
-                return false;
-            }
-        }
-    }
+/// A labeled timing_distribution.
+pub type LabeledTimingDistribution = LabeledMetric<TimingDistributionMetric>;
+
+/// A labeled quantity
+pub type LabeledQuantity = LabeledMetric<QuantityMetric>;
+
+/// The metric data needed to construct inner submetrics.
+///
+/// Different Labeled metrics require different amounts and kinds of information to
+/// be constructed.
+pub enum LabeledMetricData {
+    /// The common case: just a CMD.
+    #[allow(missing_docs)]
+    Common { cmd: CommonMetricData },
+    /// The custom_distribution-specific case.
+    #[allow(missing_docs)]
+    CustomDistribution {
+        cmd: CommonMetricData,
+        range_min: i64,
+        range_max: i64,
+        bucket_count: i64,
+        histogram_type: HistogramType,
+    },
+    /// The memory_distribution-specific case.
+    #[allow(missing_docs)]
+    MemoryDistribution {
+        cmd: CommonMetricData,
+        unit: MemoryUnit,
+    },
+    /// The timing_distribution-specific case.
+    #[allow(missing_docs)]
+    TimingDistribution {
+        cmd: CommonMetricData,
+        unit: TimeUnit,
+    },
 }
 
 /// A labeled metric.
@@ -103,8 +90,10 @@ pub struct LabeledMetric<T> {
 ///
 /// We wrap it in a private module that is inaccessible outside of this module.
 mod private {
-    use crate::{
-        metrics::BooleanMetric, metrics::CounterMetric, metrics::StringMetric, CommonMetricData,
+    use super::LabeledMetricData;
+    use crate::metrics::{
+        BooleanMetric, CounterMetric, CustomDistributionMetric, MemoryDistributionMetric,
+        QuantityMetric, StringMetric, TimingDistributionMetric,
     };
 
     /// The sealed labeled trait.
@@ -114,24 +103,75 @@ mod private {
     /// `Labeled<T>` trait.
     pub trait Sealed {
         /// Create a new `glean_core` metric from the metadata.
-        fn new_inner(meta: crate::CommonMetricData) -> Self;
+        fn new_inner(meta: LabeledMetricData) -> Self;
     }
 
     impl Sealed for CounterMetric {
-        fn new_inner(meta: CommonMetricData) -> Self {
-            Self::new(meta)
+        fn new_inner(meta: LabeledMetricData) -> Self {
+            match meta {
+                LabeledMetricData::Common { cmd } => Self::new(cmd),
+                _ => panic!("Incorrect construction of Labeled<CounterMetric>"),
+            }
         }
     }
 
     impl Sealed for BooleanMetric {
-        fn new_inner(meta: CommonMetricData) -> Self {
-            Self::new(meta)
+        fn new_inner(meta: LabeledMetricData) -> Self {
+            match meta {
+                LabeledMetricData::Common { cmd } => Self::new(cmd),
+                _ => panic!("Incorrect construction of Labeled<BooleanMetric>"),
+            }
         }
     }
 
     impl Sealed for StringMetric {
-        fn new_inner(meta: CommonMetricData) -> Self {
-            Self::new(meta)
+        fn new_inner(meta: LabeledMetricData) -> Self {
+            match meta {
+                LabeledMetricData::Common { cmd } => Self::new(cmd),
+                _ => panic!("Incorrect construction of Labeled<StringMetric>"),
+            }
+        }
+    }
+
+    impl Sealed for CustomDistributionMetric {
+        fn new_inner(meta: LabeledMetricData) -> Self {
+            match meta {
+                LabeledMetricData::CustomDistribution {
+                    cmd,
+                    range_min,
+                    range_max,
+                    bucket_count,
+                    histogram_type,
+                } => Self::new(cmd, range_min, range_max, bucket_count, histogram_type),
+                _ => panic!("Incorrect construction of Labeled<CustomDistributionMetric>"),
+            }
+        }
+    }
+
+    impl Sealed for MemoryDistributionMetric {
+        fn new_inner(meta: LabeledMetricData) -> Self {
+            match meta {
+                LabeledMetricData::MemoryDistribution { cmd, unit } => Self::new(cmd, unit),
+                _ => panic!("Incorrect construction of Labeled<MemoryDistributionMetric>"),
+            }
+        }
+    }
+
+    impl Sealed for TimingDistributionMetric {
+        fn new_inner(meta: LabeledMetricData) -> Self {
+            match meta {
+                LabeledMetricData::TimingDistribution { cmd, unit } => Self::new(cmd, unit),
+                _ => panic!("Incorrect construction of Labeled<TimingDistributionMetric>"),
+            }
+        }
+    }
+
+    impl Sealed for QuantityMetric {
+        fn new_inner(meta: LabeledMetricData) -> Self {
+            match meta {
+                LabeledMetricData::Common { cmd } => Self::new(cmd),
+                _ => panic!("Incorrect construction of Labeled<QuantityMetric>"),
+            }
         }
     }
 }
@@ -139,7 +179,7 @@ mod private {
 /// Trait for metrics that can be nested inside a labeled metric.
 pub trait AllowLabeled: MetricType {
     /// Create a new labeled metric.
-    fn new_labeled(meta: CommonMetricData) -> Self;
+    fn new_labeled(meta: LabeledMetricData) -> Self;
 }
 
 // Implement the trait for everything we marked as allowed.
@@ -148,7 +188,7 @@ where
     T: MetricType,
     T: private::Sealed,
 {
-    fn new_labeled(meta: CommonMetricData) -> Self {
+    fn new_labeled(meta: LabeledMetricData) -> Self {
         T::new_inner(meta)
     }
 }
@@ -160,7 +200,10 @@ where
     /// Creates a new labeled metric from the given metric instance and optional list of labels.
     ///
     /// See [`get`](LabeledMetric::get) for information on how static or dynamic labels are handled.
-    pub fn new(meta: CommonMetricData, labels: Option<Vec<Cow<'static, str>>>) -> LabeledMetric<T> {
+    pub fn new(
+        meta: LabeledMetricData,
+        labels: Option<Vec<Cow<'static, str>>>,
+    ) -> LabeledMetric<T> {
         let submetric = T::new_labeled(meta);
         LabeledMetric::new_inner(submetric, labels)
     }
@@ -265,8 +308,6 @@ where
     /// # Arguments
     ///
     /// * `error` - The type of error
-    /// * `ping_name` - represents the optional name of the ping to retrieve the
-    ///   metric for. Defaults to the first value in `send_in_pings`.
     ///
     /// # Returns
     ///
@@ -338,8 +379,8 @@ pub fn validate_dynamic_label(
         );
         record_error(glean, meta, ErrorType::InvalidLabel, msg, None);
         true
-    } else if !matches_label_regex(label) {
-        let msg = format!("label must be snake_case, got '{}'", label);
+    } else if label.chars().any(|c| !c.is_ascii() || c.is_ascii_control()) {
+        let msg = format!("label must be printable ascii, got '{}'", label);
         record_error(glean, meta, ErrorType::InvalidLabel, msg, None);
         true
     } else {

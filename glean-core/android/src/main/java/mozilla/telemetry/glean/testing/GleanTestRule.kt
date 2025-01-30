@@ -11,6 +11,8 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import mozilla.telemetry.glean.BuildInfo
 import mozilla.telemetry.glean.Glean
 import mozilla.telemetry.glean.config.Configuration
+import mozilla.telemetry.glean.private.NoReasonCodes
+import mozilla.telemetry.glean.private.PingType
 import mozilla.telemetry.glean.private.TimeUnit
 import mozilla.telemetry.glean.scheduler.MetricsPingScheduler
 import mozilla.telemetry.glean.utils.getISOTimeString
@@ -38,7 +40,7 @@ import java.util.Calendar
 @VisibleForTesting(otherwise = VisibleForTesting.NONE)
 class GleanTestRule(
     val context: Context,
-    val configToUse: Configuration = Configuration()
+    val configToUse: Configuration = Configuration(),
 ) : TestWatcher() {
     /**
      * Invoked when a test is about to start.
@@ -68,10 +70,52 @@ class GleanTestRule(
 
         mps.updateSentDate(getISOTimeString(fakeNow, truncateTo = TimeUnit.DAY))
 
+        PingType<NoReasonCodes>(
+            name = "store1",
+            includeClientId = true,
+            sendIfEmpty = false,
+            preciseTimestamps = true,
+            includeInfoSections = true,
+            enabled = true,
+            schedulesPings = emptyList(),
+            reasonCodes = emptyList(),
+            followsCollectionEnabled = true,
+        )
+        PingType<NoReasonCodes>(
+            name = "store2",
+            includeClientId = true,
+            sendIfEmpty = false,
+            preciseTimestamps = true,
+            includeInfoSections = true,
+            enabled = true,
+            schedulesPings = emptyList(),
+            reasonCodes = emptyList(),
+            followsCollectionEnabled = true,
+        )
+        PingType<NoReasonCodes>(
+            name = "store3",
+            includeClientId = true,
+            sendIfEmpty = false,
+            preciseTimestamps = true,
+            includeInfoSections = true,
+            enabled = true,
+            schedulesPings = emptyList(),
+            reasonCodes = emptyList(),
+            followsCollectionEnabled = true,
+        )
+
         Glean.resetGlean(
             context = context,
             config = configToUse,
-            clearStores = true
+            clearStores = true,
         )
+    }
+
+    override fun finished(description: Description?) {
+        // This closes the database to help prevent leaking it during tests.
+        // See Bug1719905 for more info.
+        WorkManagerTestInitHelper.closeWorkDatabase()
+
+        super.finished(description)
     }
 }

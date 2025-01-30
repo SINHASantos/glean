@@ -14,7 +14,6 @@ import mozilla.telemetry.glean.getWorkerStatus
 import mozilla.telemetry.glean.private.CommonMetricData
 import mozilla.telemetry.glean.private.EventMetricType
 import mozilla.telemetry.glean.private.Lifetime
-import mozilla.telemetry.glean.private.NoExtraKeys
 import mozilla.telemetry.glean.private.NoExtras
 import mozilla.telemetry.glean.private.NoReasonCodes
 import mozilla.telemetry.glean.private.PingType
@@ -27,6 +26,7 @@ import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -67,9 +67,10 @@ class CustomPingTest {
         resetGlean(
             context,
             Glean.configuration.copy(
-                serverEndpoint = "http://" + server.hostName + ":" + server.port
+                serverEndpoint = "http://" + server.hostName + ":" + server.port,
             ),
-            clearStores = true, uploadEnabled = true
+            clearStores = true,
+            uploadEnabled = true,
         )
 
         // Define a new custom ping inline.
@@ -77,7 +78,12 @@ class CustomPingTest {
             name = "custom-ping",
             includeClientId = true,
             sendIfEmpty = true,
-            reasonCodes = emptyList()
+            preciseTimestamps = true,
+            includeInfoSections = true,
+            enabled = true,
+            schedulesPings = emptyList(),
+            reasonCodes = emptyList(),
+            followsCollectionEnabled = true,
         )
 
         customPing.submit()
@@ -94,9 +100,10 @@ class CustomPingTest {
         resetGlean(
             context,
             Glean.configuration.copy(
-                serverEndpoint = "http://" + server.hostName + ":" + server.port
+                serverEndpoint = "http://" + server.hostName + ":" + server.port,
             ),
-            clearStores = true, uploadEnabled = true
+            clearStores = true,
+            uploadEnabled = true,
         )
 
         // Define a new custom ping inline.
@@ -104,7 +111,12 @@ class CustomPingTest {
             name = "custom-ping",
             includeClientId = true,
             sendIfEmpty = true,
-            reasonCodes = emptyList()
+            preciseTimestamps = true,
+            includeInfoSections = true,
+            enabled = true,
+            schedulesPings = emptyList(),
+            reasonCodes = emptyList(),
+            followsCollectionEnabled = true,
         )
 
         // Trigger the ping twice.
@@ -143,29 +155,13 @@ class CustomPingTest {
         resetGlean(
             context,
             Glean.configuration.copy(
-                serverEndpoint = "http://" + server.hostName + ":" + server.port
+                serverEndpoint = "http://" + server.hostName + ":" + server.port,
             ),
-            clearStores = true, uploadEnabled = true
+            clearStores = true,
+            uploadEnabled = true,
         )
 
         val pingName = "custom-events-1"
-
-        // Define a 'click' event
-        val click = EventMetricType<NoExtraKeys, NoExtras>(
-            CommonMetricData(
-                disabled = false,
-                category = "ui",
-                lifetime = Lifetime.PING,
-                name = "click",
-                sendInPings = listOf(pingName),
-            ),
-            allowedExtraKeys = emptyList()
-        )
-        // and record it in the currently initialized Glean instance.
-        click.record(NoExtras())
-
-        // We need to simulate that the app is shutdown and all resources are freed.
-        Glean.testDestroyGleanHandle()
 
         // Define a new custom ping inline.
         // This will register the ping as well.
@@ -174,30 +170,55 @@ class CustomPingTest {
         val customPing = PingType<NoReasonCodes>(
             name = pingName,
             includeClientId = true,
-            sendIfEmpty = false,
-            reasonCodes = emptyList()
+            sendIfEmpty = true,
+            preciseTimestamps = true,
+            includeInfoSections = true,
+            enabled = true,
+            schedulesPings = emptyList(),
+            reasonCodes = emptyList(),
+            followsCollectionEnabled = true,
         )
+
+        // Define a 'click' event
+        val click = EventMetricType<NoExtras>(
+            CommonMetricData(
+                disabled = false,
+                category = "ui",
+                lifetime = Lifetime.PING,
+                name = "click",
+                sendInPings = listOf(pingName),
+            ),
+            allowedExtraKeys = emptyList(),
+        )
+        // and record it in the currently initialized Glean instance.
+        click.record(NoExtras())
+
+        // We need to simulate that the app is shutdown and all resources are freed.
+        Glean.testDestroyGleanHandle()
+
+        // The PingUploadWorker might be queued for at-init reasons, so to ensure
+        // init didn't submit this custom ping we submit it deliberately only once,
+        // and assert that we didn't receive it twice.
 
         // This is equivalent to a consumer calling `Glean.initialize` at startup
         resetGlean(
             context,
             Glean.configuration.copy(
-                serverEndpoint = "http://" + server.hostName + ":" + server.port
+                serverEndpoint = "http://" + server.hostName + ":" + server.port,
             ),
-            clearStores = false, uploadEnabled = true
+            clearStores = false,
+            uploadEnabled = true,
         )
 
-        // There should be no ping upload worker,
-        // because there is no ping to upload.
-        assertFalse(getWorkerStatus(context, PingUploadWorker.PING_WORKER_TAG).isEnqueued)
-
-        // But if the custom ping is specifically submitted,
+        // If the custom ping is specifically submitted,
         // it should be received.
         customPing.submit()
         // Trigger work manager once.
         // This should launch one worker that handles all pending pings.
         triggerWorkManager(context)
         var request = server.takeRequest(2L, TimeUnit.SECONDS)!!
+        // Assert we only got the one:
+        assertNull(server.takeRequest(2L, TimeUnit.SECONDS))
         var docType = request.path!!.split("/")[3]
         assertEquals(pingName, docType)
 
@@ -210,5 +231,57 @@ class CustomPingTest {
         val name = event.getString("name")
         assertEquals("ui.click", "$category.$name")
         assertEquals(0, event.getLong("timestamp"))
+    }
+
+    @Test
+    fun `custom pings can be disabled remotely`() {
+        delayMetricsPing(context)
+        resetGlean(
+            context,
+            Glean.configuration.copy(
+                serverEndpoint = "http://" + server.hostName + ":" + server.port,
+            ),
+            clearStores = true,
+            uploadEnabled = true,
+        )
+
+        // Define a new custom ping inline.
+        val customPing = PingType<NoReasonCodes>(
+            name = "custom-ping",
+            includeClientId = true,
+            sendIfEmpty = true,
+            preciseTimestamps = true,
+            includeInfoSections = true,
+            enabled = true,
+            schedulesPings = emptyList(),
+            reasonCodes = emptyList(),
+            followsCollectionEnabled = true,
+        )
+
+        customPing.submit()
+        triggerWorkManager(context)
+
+        val request = server.takeRequest(2L, TimeUnit.SECONDS)!!
+        val docType = request.path!!.split("/")[3]
+        assertEquals("custom-ping", docType)
+
+        // Now disable the custom ping using Server Knobs
+        val remoteSettingsConfig = """
+            {
+              "pings_enabled": {
+                "custom-ping": false
+              }
+            }
+        """.trimIndent()
+        Glean.applyServerKnobsConfig(remoteSettingsConfig)
+
+        customPing.submit()
+        // Check that the work is scheduled
+        val workerTag = PingUploadWorker.PING_WORKER_TAG
+        val status = getWorkerStatus(context, workerTag)
+        assertFalse(
+            "No ping should be enqueued",
+            status.isEnqueued,
+        )
     }
 }

@@ -20,22 +20,33 @@ class OnGleanEventsImpl: OnGleanEvents {
         self.glean = glean
     }
 
-    func onInitializeFinished() {
-        // Run this off the main thread,
-        // as it will trigger a ping submission,
-        // which itself will trigger `triggerUpload()` on this class.
-        Dispatchers.shared.launchAsync {
-            self.glean.observer = GleanLifecycleObserver()
+    func initializeFinished() {
+        // Only set up the lifecycle observer if no dataPath is specified.
+        if !self.glean.isCustomDataPath {
+            // Run this off the main thread,
+            // as it will trigger a ping submission,
+            // which itself will trigger `triggerUpload()` on this class.
+            Dispatchers.shared.launchAsync {
+                self.glean.observer = GleanLifecycleObserver()
+            }
         }
+
         self.glean.initialized = true
     }
 
     func triggerUpload() {
         // If uploading is disabled, we need to send the deletion-request ping
-        HttpPingUploader.launch(configuration: self.glean.configuration!, self.glean.testingMode.value)
+        HttpPingUploader.launch(configuration: self.glean.configuration!)
     }
 
     func startMetricsPingScheduler() -> Bool {
+        // If we pass a custom data path, the metrics ping schedule should not
+        // be setup.
+        if self.glean.isCustomDataPath {
+            self.glean.metricsPingScheduler = nil
+            return false
+        }
+
         self.glean.metricsPingScheduler = MetricsPingScheduler(self.glean.testingMode.value)
         // Check for overdue metrics pings
         return self.glean.metricsPingScheduler!.schedule()
@@ -43,6 +54,10 @@ class OnGleanEventsImpl: OnGleanEvents {
 
     func cancelUploads() {
         // intentionally left empty
+    }
+
+    func shutdown() {
+        shutdownUploader()
     }
 }
 
@@ -75,6 +90,8 @@ public class Glean {
     var configuration: Configuration?
     private var buildInfo: BuildInfo?
     fileprivate var observer: GleanLifecycleObserver?
+    private var gleanDataPath: String?
+    var isCustomDataPath: Bool = false
 
     // This struct is used for organizational purposes to keep the class constants in a single place
     struct Constants {
@@ -87,6 +104,9 @@ public class Glean {
     // Cache variable for checking if running in main process.  Also used to override for tests in
     // order to simulate not running in the main process.  DO NOT SET EXCEPT IN TESTS!
     var isMainProcess: Bool?
+
+    // Tracks the active/inactive state to prevent calling `handleClientActive` multiple times.
+    var isActive: Bool = false
 
     private init() {
         // intentionally left private, no external user can instantiate a new global object.
@@ -114,15 +134,42 @@ public class Glean {
     ///       If disabled, all persisted metrics, events and queued pings (except
     ///       first_run_date) are cleared.
     ///     * configuration: A Glean `Configuration` object with global settings.
-    public func initialize(uploadEnabled: Bool,
-                           configuration: Configuration = Configuration(),
-                           buildInfo: BuildInfo) {
-        // In certain situations Glean.initialize may be called from a process other than the main
-        // process such as an embedded extension. In this case we want to just return.
-        // See https://bugzilla.mozilla.org/show_bug.cgi?id=1625157 for more information.
-        if !checkIsMainProcess() {
-            logger.error("Attempted to initialize Glean on a process other than the main process")
-            return
+    ///     * buildInfo: A Glean `BuildInfo` object with build settings.
+    public func initialize(uploadEnabled: Bool, configuration: Configuration = Configuration(), buildInfo: BuildInfo) {
+        if let safeDataPath = configuration.dataPath {
+            // When the `dataPath` is provided, we need to make sure:
+            //   1. The database path provided is not the default glean database path.
+            //   2. The database path is valid and writeable.
+
+            // The background process and the main process cannot write to the same file.
+            if safeDataPath == getGleanDirectory().relativePath {
+                logger.error("Attempted to initialize Glean with an invalid database path \"glean_data\" is reserved")
+                return
+            }
+
+            // Check that the database path we are trying to write to is valid and writable.
+            if !canWriteToDatabasePath(safeDataPath) {
+                logger.error("Attempted to initialize Glean with an invalid database path")
+                return
+            }
+
+            self.gleanDataPath = safeDataPath
+            self.isCustomDataPath = true
+        } else {
+            // If no `dataPath` is provided, then we setup Glean as usual.
+            //
+            // In certain situations Glean.initialize may be called from a process other than the main
+            // process such as an embedded extension. In this case we want to just return.
+            // See https://bugzilla.mozilla.org/show_bug.cgi?id=1625157 for more information.
+            if !checkIsMainProcess() {
+                logger.error(
+                    "Attempted to initialize Glean on a process other than the main process without a dataPath"
+                )
+                return
+            }
+
+            self.gleanDataPath = getGleanDirectory().relativePath
+            self.isCustomDataPath = false
         }
 
         if self.isInitialized() {
@@ -130,17 +177,28 @@ public class Glean {
             return
         }
 
+        startUploader()
+
         self.buildInfo = buildInfo
         self.configuration = configuration
         let cfg = InternalConfiguration(
-            dataPath: getGleanDirectory().relativePath,
+            dataPath: self.gleanDataPath!,
             applicationId: AppInfo.name,
             languageBindingName: Constants.languageBindingName,
             uploadEnabled: uploadEnabled,
             maxEvents: configuration.maxEvents.map { UInt32($0) },
             delayPingLifetimeIo: false,
             appBuild: "0.0.0",
-            useCoreMps: false
+            useCoreMps: false,
+            trimDataToRegisteredPings: false,
+            logLevel: configuration.logLevel,
+            rateLimit: nil,
+            enableEventTimestamps: configuration.enableEventTimestamps,
+            experimentationId: configuration.experimentationId,
+            enableInternalPings: configuration.enableInternalPings,
+            pingSchedule: configuration.pingSchedule,
+            pingLifetimeThreshold: UInt64(configuration.pingLifetimeThreshold),
+            pingLifetimeMaxTime: UInt64(configuration.pingLifetimeMaxTime)
         )
         let clientInfo = getClientInfo(configuration, buildInfo: buildInfo)
         let callbacks = OnGleanEventsImpl(glean: self)
@@ -162,6 +220,27 @@ public class Glean {
         )
     }
 
+    /// **DEPRECATED** Enable or disable Glean collection and upload.
+    ///
+    /// Metric collection is enabled by default.
+    ///
+    /// When uploading is disabled, metrics aren't recorded at all and no data
+    /// is uploaded.
+    ///
+    /// When disabling, all pending metrics, events and queued pings are cleared.
+    ///
+    /// When enabling, the core Glean metrics are recreated.
+    ///
+    /// **DEPRECATION NOTICE**:
+    /// This API is deprecated. Use `setCollectionEnabled` instead.
+    ///
+    /// - parameters:
+    ///     * enabled: When true, enable metric collection.
+    @available(*, deprecated, message: "Use `setCollectionEnabled` instead.")
+    public func setUploadEnabled(_ enabled: Bool) {
+        gleanSetUploadEnabled(enabled)
+    }
+
     /// Enable or disable Glean collection and upload.
     ///
     /// Metric collection is enabled by default.
@@ -175,7 +254,7 @@ public class Glean {
     ///
     /// - parameters:
     ///     * enabled: When true, enable metric collection.
-    public func setUploadEnabled(_ enabled: Bool) {
+    public func setCollectionEnabled(_ enabled: Bool) {
         gleanSetUploadEnabled(enabled)
     }
 
@@ -201,7 +280,7 @@ public class Glean {
         gleanSetExperimentInactive(experimentId)
     }
 
-    /// Tests wheter an experiment is active, for testing purposes only.
+    /// Tests whether an experiment is active, for testing purposes only.
     ///
     /// - parameters:
     ///     * experimentId: The id of the experiment to look for.
@@ -223,6 +302,24 @@ public class Glean {
         return gleanTestGetExperimentData(experimentId)
     }
 
+    /// Dynamically set the experimentation identifier, as opposed to setting it through the configuration
+    /// during initialization.
+    ///
+    /// - parameters:
+    ///     * experimentationId: The `String` identifier to set
+    public func setExperimentationId(_ experimentationId: String) {
+        gleanSetExperimentationId(experimentationId)
+    }
+
+    /// PUBLIC TEST ONLY FUNCTION.
+    ///
+    /// Returns the stored experimentation id, for testing purposes only.
+    ///
+    /// - returns: the 'String' experimentation id if set, and `nil` otherwise.
+    public func testGetExperimentationId() -> String? {
+        return gleanTestGetExperimentationId()
+    }
+
     /// Returns true if the Glean SDK has been initialized.
     func isInitialized() -> Bool {
         return self.initialized
@@ -230,14 +327,20 @@ public class Glean {
 
     /// Handle foreground event and submit appropriate pings
     func handleForegroundEvent() {
-        gleanHandleClientActive()
+        if !isActive {
+            gleanHandleClientActive()
+            isActive = true
+        }
 
         GleanValidation.foregroundCount.add(1)
     }
 
     /// Handle background event and submit appropriate pings
     func handleBackgroundEvent() {
-        gleanHandleClientInactive()
+        if isActive {
+            gleanHandleClientInactive()
+            isActive = false
+        }
     }
 
     /// Collect and submit a ping by name for eventual uploading
@@ -257,6 +360,16 @@ public class Glean {
         gleanSubmitPingByName(pingName, reason)
     }
 
+    /// Gets a `Set` of the currently registered ping names.
+    ///
+    /// **WARNING** This function will block if Glean hasn't been initialized and
+    /// should only be used for debug purposes.
+    ///
+    /// - returns: The set of ping names that have been registered.
+    func getRegisteredPingNames() -> Set<String> {
+        return Set(gleanGetRegisteredPingNames())
+    }
+
     /// Register the pings generated from `pings.yaml` with the Glean SDK.
     ///
     /// - parameters:
@@ -271,17 +384,37 @@ public class Glean {
     ///
     /// - parameters:
     ///     * value: The value of the tag, which must be a valid HTTP header value.
-    func setDebugViewTag(_ tag: String) -> Bool {
+    @discardableResult public func setDebugViewTag(_ tag: String) -> Bool {
         return gleanSetDebugViewTag(tag)
     }
+
+    /// Get the current Debug View tag
+    ///
+    /// **WARNING** This function will block if Glean hasn't been initialized and
+    /// should only be used for debug purposes.
+    ///
+    /// - returns: [String] value of the current debug tag, or `nil` if not set.
+     func getDebugViewTag() -> String? {
+        return gleanGetDebugViewTag()
+     }
 
     /// Set the log_pings debug option,
     /// when this option is `true` the pings that are successfully submitted get logged.
     ///
     /// - parameters:
     ///     * value: The value of the option.
-    func setLogPings(_ value: Bool) {
+    public func setLogPings(_ value: Bool) {
         gleanSetLogPings(value)
+    }
+
+    /// Get the current value for the debug ping logging
+    ///
+    /// **WARNING** This function will block if Glean hasn't been initialized and
+    /// should only be used for debug purposes.
+    ///
+    /// - returns: `Bool` value indicating the state of debug ping logging.
+    func getLogPings() -> Bool {
+        return gleanGetLogPings()
     }
 
     /// Set the source tags to be applied as headers when uploading pings.
@@ -294,6 +427,38 @@ public class Glean {
     ///    * tags: A list of tags, which must be valid HTTP header values.
     public func setSourceTags(_ tags: [String]) -> Bool {
         gleanSetSourceTags(tags)
+    }
+
+    /// EXPERIMENTAL: Register a listener to receive notification of event recordings
+    ///
+    /// - parameters:
+    ///     * tag: String used to identify the listener when unregistering it
+    ///     * listener: Implements `GleanEventListener` protocol
+    public func registerEventListener(tag: String, listener: GleanEventListener) {
+        gleanRegisterEventListener(tag, listener)
+    }
+
+    /// EXPERIMENTAL: Unregister a listener to receive notification of event recordings
+    ///
+    /// - parameters:
+    ///     * tag: String used to identify the listener when it was registered
+    public func unregisterEventListener(tag: String) {
+        gleanUnregisterEventListener(tag)
+    }
+
+    /// Set configuration to override metrics' default enabled/disabled state, typically from
+    /// a remote_settings experiment or rollout.
+    ///
+    /// - parameters:
+    ///    * json: Stringified JSON map of metric identifiers (category.name) to a boolean
+    ///            representing wether they are enabled
+    public func applyServerKnobsConfig(_ json: String) {
+        gleanApplyServerKnobsConfig(json)
+    }
+
+    /// Shuts down Glean in an orderly fashion
+    public func shutdown() {
+        gleanShutdown()
     }
 
     /// When applications are launched using the custom URL scheme, this helper function will process
@@ -310,7 +475,7 @@ public class Glean {
     ///
     /// The structure of the custom URL uses the following format:
     ///
-    /// `<protocol>://glean?<command 1>=<paramter 1>&<command 2>=<parameter 2> ...`
+    /// `<protocol>://glean?<command 1>=<parameter 1>&<command 2>=<parameter 2> ...`
     ///
     /// Where:
     ///
@@ -322,7 +487,7 @@ public class Glean {
     /// There are a few things to consider when creating the custom URL:
     ///
     /// - Invalid commands will trigger an error and be ignored.
-    /// - Not all commands are requred to be encoded in the URL, you can mix and match the commands that you need.
+    /// - Not all commands are required to be encoded in the URL, you can mix and match the commands that you need.
     /// - Special characters should be properly URL encoded and escaped since this needs to represent a valid URL.
     public func handleCustomUrl(url: URL) {
         GleanDebugUtility.handleCustomUrl(url: url)
@@ -354,9 +519,9 @@ public class Glean {
     }
 
     /// Test-only method to destroy the owned glean-core handle.
-    func testDestroyGleanHandle(_ clearStores: Bool = false) {
+    func testDestroyGleanHandle(_ clearStores: Bool = false, _ customDataPath: String? = nil) {
         // If it was initialized this also clears the directory
-        let dataPath = getGleanDirectory().relativePath
+        let dataPath = customDataPath ?? getGleanDirectory().relativePath
         gleanTestDestroyGlean(clearStores, dataPath)
 
         if !isInitialized() {
@@ -389,11 +554,15 @@ public class Glean {
     /// - parameters:
     ///     * configuration: the `Configuration` to init Glean with
     ///     * clearStores: if true, clear the contents of all stores
+    ///     * uploadEnabled: whether upload is enabled
     public func resetGlean(configuration: Configuration = Configuration(),
                            clearStores: Bool,
                            uploadEnabled: Bool = true) {
         // Init Glean.
-        testDestroyGleanHandle(clearStores)
+        testDestroyGleanHandle(clearStores, configuration.dataPath)
+
+        // Reset isActive
+        isActive = false
 
         // Enable test mode.
         enableTestingMode()

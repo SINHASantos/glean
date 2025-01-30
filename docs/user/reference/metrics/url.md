@@ -87,7 +87,7 @@ search.template.set("https://mysearchengine.com/");
 **C++**
 
 ```c++
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/SearchMetrics.h"
 
 mozilla::glean::search::template.Set("https://mysearchengine.com/"_ns);
 ```
@@ -146,6 +146,8 @@ search.template.setUrl(new URL("https://mysearchengine.com/"));
 Gets the recorded value for a given URL metric as a (unencoded) string.  
 Returns a URL if data is stored.  
 Returns a language-specific empty/null value if no data is stored.
+Has an optional argument to specify the name of the ping you wish to retrieve data from, except
+in Rust where it's required. `None` or no argument will default to the first value found for `send_in_pings`.
 
 {{#include ../../../shared/tab_header.md}}
 
@@ -343,8 +345,8 @@ refer to the metrics [YAML format](../yaml/index.md) reference page.
 ## Note on `data_sensitivity` of URL metrics
 
 > URL metrics can only either be on categories 3 or 4, namely
-> ["Web activity data"](../yaml/metrics.md#category-3-web-activity-data-web_activity) or
-> ["Highly sensitive data"](../yaml/metrics.md#category-4-highly-sensitive-data-highly_sensitive).
+> ["Stored Content & Communications"](../yaml/metrics.md#category-3-stored-content--communications-stored_content) or
+> ["Highly sensitive data"](../yaml/metrics.md#category-4-highly-sensitive-data-or-clearly-identifiable-personal-data-highly_sensitive).
 
 ### Extra metric parameters
 
@@ -353,7 +355,3 @@ N/A
 ## Data questions
 
 * What is the base URL used to build the search query for the search engine?
-
-## Reference
-
-* [JavaScript API docs](https://mozilla.github.io/glean.js/classes/core_metrics_types_url.default.html)

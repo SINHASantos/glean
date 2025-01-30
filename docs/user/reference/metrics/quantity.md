@@ -76,7 +76,7 @@ display.width.set(window.innerWidth);
 **C++**
 
 ```cpp
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/GfxMetrics.h"
 
 mozilla::glean::display::width.Set(innerWidth);
 ```
@@ -106,6 +106,8 @@ Glean.display.width.set(innerWidth);
 Gets the recorded value for a given quantity metric.  
 Returns the quantity value if data is stored.  
 Returns a language-specific empty/null value if no data is stored.
+Has an optional argument to specify the name of the ping you wish to retrieve data from, except
+in Rust where it's required. `None` or no argument will default to the first value found for `send_in_pings`.
 
 {{#include ../../../shared/tab_header.md}}
 
@@ -174,7 +176,7 @@ assert.strictEqual(433, await display.width.testGetValue());
 **C++**
 
 ```cpp
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/GfxMetrics.h"
 
 ASSERT_TRUE(mozilla::glean::display::width.TestGetValue().isOk());
 ASSERT_EQ(433, mozilla::glean::display::width.TestGetValue().unwrap().value());
@@ -312,6 +314,5 @@ Quantities have the required `unit` parameter, which is a free-form string for d
 ## Reference
 
 * [Swift API docs](../../../swift/Classes/QuantityMetricType.html)
-* [Python API docs](../../../python/glean/metrics/quantity.html)
+* [Python API docs](../../../python/glean/metrics/index.html#glean.metrics.QuantityMetric)
 * [Rust API docs](../../../docs/glean/private/quantity/struct.QuantityMetric.html)
-* [JavaScript API docs](https://mozilla.github.io/glean.js/classes/core_metrics_types_quantity.default.html#set)

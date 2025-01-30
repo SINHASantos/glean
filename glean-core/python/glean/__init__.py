@@ -4,11 +4,10 @@
 
 """Top-level package for Glean SDK."""
 
-
 import warnings
 
 
-from pkg_resources import get_distribution, DistributionNotFound
+import importlib.metadata
 from semver import VersionInfo  # type: ignore
 
 
@@ -22,8 +21,8 @@ from ._loader import load_metrics, load_pings
 
 __version__: str = "unknown"
 try:
-    __version__ = str(get_distribution("glean-sdk").version)
-except DistributionNotFound:  # pragma: no cover
+    __version__ = importlib.metadata.version("glean-sdk")
+except importlib.metadata.PackageNotFoundError:  # pragma: no cover
     pass
 
 
@@ -31,7 +30,7 @@ __author__ = "The Glean Team"
 __email__ = "glean-team@mozilla.com"
 
 
-GLEAN_PARSER_VERSION = "6.4.0"
+GLEAN_PARSER_VERSION = "16.1.0"
 parser_version = VersionInfo.parse(GLEAN_PARSER_VERSION)
 parser_version_next_major = parser_version.bump_major()
 
@@ -42,6 +41,7 @@ if current_parser < parser_version or current_parser >= parser_version_next_majo
         f"glean_sdk expected glean_parser ~= v{GLEAN_PARSER_VERSION}, "
         f"found v{glean_parser.__version__}",
         Warning,
+        stacklevel=1,
     )
 
 

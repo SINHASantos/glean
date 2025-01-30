@@ -93,7 +93,7 @@ controls.refreshPressed.add(5); // Adds 5 to the counter.
 **C++**
 
 ```cpp
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/UrlbarMetrics.h"
 
 mozilla::glean::controls::refresh_pressed.Add(1);
 mozilla::glean::controls::refresh_pressed.Add(5);
@@ -111,7 +111,8 @@ Glean.controls.refreshPressed.add(5);
 
 #### Recorded errors
 
-* [`invalid_value`](../../user/metrics/error-reporting.md): If the counter is incremented by `0` or a negative value.
+* [`invalid_value`](../../user/metrics/error-reporting.md): If the counter is incremented by a negative value
+  (or, in versions up to and including 54.0.0, `0`).
 * [`invalid_type`](../../user/metrics/error-reporting.md): If a floating point or non-number value is given.
 
 #### Limits
@@ -126,6 +127,8 @@ Glean.controls.refreshPressed.add(5);
 Gets the recorded value for a given counter metric.  
 Returns the count if data is stored.  
 Returns a language-specific empty/null value if no data is stored.
+Has an optional argument to specify the name of the ping you wish to retrieve data from, except
+in Rust where it's required. `None` or no argument will default to the first value found for `send_in_pings`.
 
 {{#include ../../../shared/tab_header.md}}
 
@@ -194,7 +197,7 @@ assert.strictEqual(6, await controls.refreshPressed.testGetValue());
 **C++**
 
 ```cpp
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/UrlbarMetrics.h"
 
 ASSERT_TRUE(mozilla::glean::controls::refresh_pressed.TestGetValue().isOk());
 ASSERT_EQ(6, mozilla::glean::controls::refresh_pressed.TestGetValue().unwrap().value());
@@ -331,6 +334,5 @@ N/A
 ## Reference
 
 * [Swift API docs](../../../swift/Classes/CounterMetricType.html)
-* [Python API docs](../../../python/glean/metrics/counter.html)
+* [Python API docs](../../../python/glean/metrics/index.html#glean.metrics.CounterMetric)
 * [Rust API docs](../../../docs/glean/private/counter/struct.CounterMetric.html)
-* [JavaScript API docs](https://mozilla.github.io/glean.js/classes/core_metrics_types_counter.default.html)

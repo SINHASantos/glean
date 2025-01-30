@@ -128,7 +128,7 @@ function onPageStart() {
 **C++**
 
 ```c++
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/DomMetrics.h"
 
 auto timerId = mozilla::glean::pages::page_load.Start();
 ```
@@ -224,7 +224,7 @@ function onPageLoaded() {
 **C++**
 
 ```c++
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/DomMetrics.h"
 
 mozilla::glean::pages::page_load.StopAndAccumulate(std::move(timerId));
 ```
@@ -238,6 +238,201 @@ Glean.pages.pageLoad.stopAndAccumulate(timerId);
 </div>
 
 {{#include ../../../shared/tab_footer.md}}
+
+### `accumulateSamples`
+
+Accumulates the provided signed samples in the metric.
+This is required so that the platform-specific code can provide us with
+64 bit signed integers if no `u64` comparable type is available. This
+will take care of filtering and reporting errors for any provided negative
+sample.
+
+Please note that this assumes that the provided samples are already in
+the "unit" declared by the instance of the metric type (e.g. if the
+instance this method was called on is using `TimeUnit::Second`, then
+`samples` are assumed to be in that unit).
+
+{{#include ../../../shared/tab_header.md}}
+
+<div data-lang="Kotlin" class="tab">
+
+```Kotlin
+import org.mozilla.yourApplication.GleanMetrics.Pages
+
+fun onPageLoaded(e: Event) {
+    Pages.pageLoad.accumulateSamples(samples)
+}
+```
+
+</div>
+<div data-lang="Java" class="tab">
+
+```Java
+import org.mozilla.yourApplication.GleanMetrics.Pages;
+
+void onPageLoaded(Event e) {
+    Pages.INSTANCE.pageLoad().accumulateSamples(samples);
+}
+```
+
+</div>
+<div data-lang="Swift" class="tab"></div>
+<div data-lang="Python" class="tab">
+
+```Python
+from glean import load_metrics
+metrics = load_metrics("metrics.yaml")
+
+class PageHandler:
+    def on_page_loaded(self, event):
+        metrics.pages.page_load.accumulate_samples(samples)
+```
+
+</div>
+<div data-lang="Rust" class="tab">
+
+```Rust
+use glean_metrics::pages;
+
+fn on_page_loaded() {
+    pages::page_load.accumulate_samples(samples);
+}
+```
+
+</div>
+<div data-lang="JavaScript" class="tab">
+
+```Javascript
+import * as pages from "./path/to/generated/files/pages.js";
+
+function onPageLoaded() {
+    pages.pageLoad.accumulateSamples(samples);
+}
+```
+
+</div>
+<div data-lang="Firefox Desktop" class="tab">
+
+**C++**
+
+```c++
+#include "mozilla/glean/DomMetrics.h"
+
+mozilla::glean::pages::page_load.AccumulateRawSamples(samples);
+```
+
+**JavaScript**
+
+```js
+Glean.pages.pageLoad.accumulateSamples(samples);
+```
+
+</div>
+
+{{#include ../../../shared/tab_footer.md}}
+
+### `accumulateSingleSample`
+
+Accumulates a single signed sample and appends it to the metric. Prefer this
+for the common use case of having a single value to avoid having to pass
+a collection over a foreign language interface.
+
+A signed value is required so that the platform-specific code can provide
+us with a 64 bit signed integer if no `u64` comparable type is available.
+This will take care of filtering and reporting errors for a negative
+sample.
+
+Please note that this assumes that the provided sample is already in
+the "unit" declared by the instance of the metric type (e.g. if the
+instance this method was called on is using `TimeUnit::Second`, then
+`sample` is assumed to be in that unit).
+
+{{#include ../../../shared/tab_header.md}}
+
+<div data-lang="Kotlin" class="tab">
+
+```Kotlin
+import org.mozilla.yourApplication.GleanMetrics.Pages
+
+fun onPageLoaded(e: Event) {
+    Pages.pageLoad.accumulateSingleSample(sample)
+}
+```
+
+</div>
+<div data-lang="Java" class="tab">
+
+```Java
+import org.mozilla.yourApplication.GleanMetrics.Pages;
+
+void onPageLoaded(Event e) {
+    Pages.INSTANCE.pageLoad().accumulateSingleSample(sample);
+}
+```
+
+</div>
+<div data-lang="Swift" class="tab"></div>
+<div data-lang="Python" class="tab">
+
+```Python
+from glean import load_metrics
+metrics = load_metrics("metrics.yaml")
+
+class PageHandler:
+    def on_page_loaded(self, event):
+        metrics.pages.page_load.accumulate_single_sample(sample)
+```
+
+</div>
+<div data-lang="Rust" class="tab">
+
+```Rust
+use glean_metrics::pages;
+
+fn on_page_loaded() {
+    pages::page_load.accumulate_single_sample(sample);
+}
+```
+
+</div>
+<div data-lang="JavaScript" class="tab">
+
+```Javascript
+import * as pages from "./path/to/generated/files/pages.js";
+
+function onPageLoaded() {
+    pages.pageLoad.accumulateSingleSample(sample);
+}
+```
+
+</div>
+<div data-lang="Firefox Desktop" class="tab">
+
+**C++**
+
+```c++
+#include "mozilla/glean/DomMetrics.h"
+
+mozilla::glean::pages::page_load.AccumulateRawDuration(aDuration);
+```
+
+**JavaScript**
+
+```js
+Glean.pages.pageLoad.accumulateSingleSample(sample);
+```
+
+</div>
+
+{{#include ../../../shared/tab_footer.md}}
+
+
+#### Limits
+
+- Samples are limited to the maximum value for the given time unit.
+- Only non-negative values may be recorded (`>= 0`).
+- Negative values are discarded and an `ErrorType::InvalidValue` is generated for each instance.
+- Samples that are longer than maximum sample time for the given unit generate an `ErrorType::InvalidOverflow` error for each instance.
 
 #### Recorded errors
 
@@ -287,7 +482,24 @@ with metrics.pages.page_load.measure():
 </div>
 <div data-lang="Rust" class="tab"></div>
 <div data-lang="JavaScript" class="tab"></div>
-<div data-lang="Firefox Desktop" class="tab"></div>
+<div data-lang="Firefox Desktop" class="tab">
+
+**C++**
+
+```c++
+#include "mozilla/glean/DomMetrics.h"
+
+{ // Scope for RAII
+  auto timer = mozilla::glean::pages::page_load.Measure();
+  // load the page
+}
+```
+
+**JavaScript**
+
+*Not currently implemented.*
+
+</div>
 
 {{#include ../../../shared/tab_footer.md}}
 
@@ -370,7 +582,7 @@ function onPageError() {
 **C++**
 
 ```c++
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/DomMetrics.h"
 
 mozilla::glean::pages::page_load.Cancel(std::move(timerId));
 ```
@@ -392,6 +604,8 @@ Glean.pages.pageLoad.cancel(timerId);
 Gets the recorded value for a given timing distribution metric.  
 Returns a struct with counts per buckets and total sum if data is stored.  
 Returns a language-specific empty/null value if no data is stored.
+Has an optional argument to specify the name of the ping you wish to retrieve data from, except
+in Rust where it's required. `None` or no argument will default to the first value found for `send_in_pings`.
 
 {{#include ../../../shared/tab_header.md}}
 
@@ -499,7 +713,7 @@ assert.equal(1, snapshot.count);
 **C++**
 
 ```c++
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/DomMetrics.h"
 
 // Does it have an expected values?
 const data = mozilla::glean::pages::page_load.TestGetValue().value().unwrap();
@@ -661,7 +875,7 @@ The allowed values for `time_unit` are:
 ## Reference
 
 * [Swift API docs](../../../swift/Classes/TimingDistributionMetricType.html)
-* [Python API docs](../../../python/glean/metrics/timing_distribution.html)
+* [Python API docs](../../../python/glean/metrics/index.html#glean.metrics.TimingDistributionMetricType)
 
 ## Simulator
 

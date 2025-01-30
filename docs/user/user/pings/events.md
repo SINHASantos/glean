@@ -18,8 +18,8 @@ The `events` ping is automatically submitted under the following circumstances:
 
 1. If there are any recorded events to send when the application becomes inactive (on mobile, this means going to [background](sent-by-glean.md#defining-foreground-and-background-state)).
 
-2. When the queue of events exceeds `Glean.configuration.maxEvents` (default 500). This configuration
-option can be changed at [initialization](../../reference/general/initializing.md).
+2. When the queue of events exceeds `Glean.configuration.maxEvents` (default 1 for Glean.js, 500 for all other SDKs). This configuration
+option can be changed at [initialization](../../reference/general/initializing.md) or through [Server Knobs](../../user/server-knobs/other/max-events.md).
 
 3. If there are any unsent events found on disk when starting the application. _(This results in this ping never containing the [`glean.restarted`](./custom.md#the-gleanrestarted-event) event.)_
 
@@ -30,7 +30,7 @@ option can be changed at [initialization](../../reference/general/initializing.m
 > Since the Glean Python and JavaScript SDKs don't have a generic concept of "inactivity",
 > case (1) above cannot be handled automatically.
 >
-> On Python, users can call the [`handle_client_inactive`](../../../python/glean/#glean.Glean.handle_client_inactive)
+> On Python, users can call the [`handle_client_inactive`](../../../python/glean/index.html#glean.Glean.handle_client_inactive)
 > API to let Glean know the app is inactive and that will trigger submission of the `events` ping.
 >
 > On JavaScript there is no such API and only cases (2) and (3) apply.
@@ -53,7 +53,7 @@ Each entry in the `events` array is an object with the following properties:
 
 - `"name"`: The name of the event, as defined in the `metrics.yaml` file.
 
-- `"extra"` (optional): A mapping of strings to strings providing additional data about the event. The keys are restricted to 40 characters and values in this map will never exceed 100 characters.
+- `"extra"` (optional): A mapping of strings to strings providing additional data about the event. Keys are restricted to 40 UTF-8 bytes while values in the `extra` object are limited a maximum length of 500 UTF-8 bytes.
   
 ### Example event JSON
 

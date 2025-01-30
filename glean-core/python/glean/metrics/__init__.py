@@ -9,6 +9,7 @@ This module contains all of the metric types.
 
 # Re-export utilities
 from .._uniffi import CommonMetricData
+from .._uniffi import LabeledMetricData
 from .._uniffi import Lifetime
 from .._uniffi import MemoryUnit
 from .._uniffi import TimerId
@@ -25,6 +26,7 @@ from .._uniffi import StringListMetric as StringListMetricType
 # Export wrapper implementations for metric types
 from .datetime import DatetimeMetricType
 from .event import EventMetricType, EventExtras, RecordedEvent
+from .object import ObjectMetricType, ObjectSerialize
 from .labeled import (
     LabeledBooleanMetricType,
     LabeledCounterMetricType,
@@ -43,23 +45,26 @@ __all__ = [
     "CommonMetricData",
     "CounterMetricType",
     "DatetimeMetricType",
+    "EventExtras",
     "EventMetricType",
-    "QuantityMetricType",
     "LabeledBooleanMetricType",
     "LabeledCounterMetricType",
+    "LabeledMetricData",
     "LabeledStringMetricType",
     "Lifetime",
     "MemoryDistributionMetricType",
     "MemoryUnit",
+    "ObjectMetricType",
+    "ObjectSerialize",
     "PingType",
+    "QuantityMetricType",
     "RecordedEvent",
-    "EventExtras",
     "RecordedExperiment",
-    "StringMetricType",
     "StringListMetricType",
-    "TimespanMetricType",
+    "StringMetricType",
     "TimeUnit",
     "TimerId",
+    "TimespanMetricType",
     "TimingDistributionMetricType",
     "UrlMetricType",
     "UuidMetricType",

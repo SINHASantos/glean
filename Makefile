@@ -4,8 +4,7 @@ help:
 	  sort | \
 	  awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-GLEAN_PYENV := $(shell python3 -c "import sys; print('glean-core/python/.venv' + '.'.join(str(x) for x in sys.version_info[:2]))")
-GLEAN_PYDEPS := ${GLEAN_PYDEPS}
+GLEAN_PYENV := $(abspath $(shell python3 -c "import sys; print('.venv' + '.'.join(str(x) for x in sys.version_info[:2]))"))
 # Read the `GLEAN_BUILD_VARIANT` variable, default to debug.
 # If set it is passed as a flag to cargo, so we prefix it with `--`
 ifeq ($(GLEAN_BUILD_VARIANT),)
@@ -19,18 +18,13 @@ endif
 
 # Setup environments
 
-python-setup: $(GLEAN_PYENV)/bin/python3 ## Setup a Python virtual environment
+setup-python: $(GLEAN_PYENV)/bin/python3 ## Setup a Python virtual environment
 	@:
 
 $(GLEAN_PYENV)/bin/python3:
 	python3 -m venv $(GLEAN_PYENV)
 	$(GLEAN_PYENV)/bin/pip install --upgrade pip wheel setuptools
 	$(GLEAN_PYENV)/bin/pip install -r glean-core/python/requirements_dev.txt
-	sh -c "if [ \"$(GLEAN_PYDEPS)\" = \"min\" ]; then \
-		$(GLEAN_PYENV)/bin/pip install requirements-builder; \
-		$(GLEAN_PYENV)/bin/requirements-builder --level=min glean-core/python/setup.py > min_requirements.txt; \
-		$(GLEAN_PYENV)/bin/pip install -r min_requirements.txt; \
-	fi"
 
 # All builds
 
@@ -48,16 +42,30 @@ build-swift: ## Build all Swift code
 build-apk: build-kotlin ## Build an apk of the Glean sample app
 	./gradlew glean-sample-app:build glean-sample-app:assembleAndroidTest
 
-build-python: python-setup ## Build the Python bindings
-	$(GLEAN_PYENV)/bin/python3 glean-core/python/setup.py build install
+build-python: setup-python ## Build the Python bindings
+	VIRTUAL_ENV=$(GLEAN_PYENV) \
+		$(GLEAN_PYENV)/bin/maturin develop
 
-bindgen-python: glean-core/python/glean/_uniffi.py  # Generate the uniffi wrapper code manually
+build-python-wheel: setup-python  ## Build a Python wheel
+	VIRTUAL_ENV=$(GLEAN_PYENV) \
+		$(GLEAN_PYENV)/bin/maturin build --release $(addprefix --target ,$(GLEAN_BUILD_TARGET))
 
-glean-core/python/glean/_uniffi.py: glean-core/src/glean.udl
-	cargo uniffi-bindgen generate $< --language python --out-dir target
-	cp target/glean.py $@
+build-python-sdist: setup-python ## Build a Python source distribution
+	VIRTUAL_ENV=$(GLEAN_PYENV) \
+		$(GLEAN_PYENV)/bin/maturin build --release --sdist
 
-.PHONY: build build-rust build-kotlin build-swift build-apk build-python bindgen-python
+build-xcframework:
+	./bin/build-xcframework.sh
+
+bindgen-python: glean-core/python/glean/_uniffi/glean.py glean-core/python/glean/_uniffi/__init__.py # Generate the uniffi wrapper code manually
+
+glean-core/python/glean/_uniffi/glean.py: glean-core/src/glean.udl
+	cargo uniffi-bindgen generate $< --language python --out-dir $(@D)
+
+glean-core/python/glean/_uniffi/__init__.py:
+	echo 'from .glean import *  # NOQA' > $@
+
+.PHONY: build build-rust build-kotlin build-swift build-apk build-python build-python-wheel build-python-sdist bindgen-python build-xcframework glean-core/python/glean/_uniffi/__init__.py
 
 # All tests
 
@@ -66,8 +74,14 @@ test: test-rust
 test-rust: ## Run Rust tests for glean-core and glean-ffi
 	cargo test --all $(addprefix --target ,$(GLEAN_BUILD_TARGET))
 
+test-rust-examples: glean-core/rlb/tests/*.sh ## Run Rust example tests
+	@for file in $^; do \
+		echo "=== $${file} ==="; \
+		./$$file || exit $?; \
+	done
+
 test-rust-with-logs: ## Run all Rust tests with debug logging and single-threaded
-	RUST_LOG=glean_core=debug cargo test --all -- --nocapture --test-threads=1 $(addprefix --target ,$(GLEAN_BUILD_TARGET))
+	RUST_LOG=glean,glean_core cargo test --all -- --nocapture --test-threads=1 $(addprefix --target ,$(GLEAN_BUILD_TARGET))
 
 test-kotlin: ## Run all Kotlin tests
 	./gradlew :glean:testDebugUnitTest
@@ -85,13 +99,6 @@ test-python: build-python ## Run all Python tests
 	$(GLEAN_PYENV)/bin/py.test -v glean-core/python/tests $(PYTEST_ARGS)
 
 .PHONY: test test-rust test-rust-with-logs test-kotlin test-swift test-ios-sample
-
-# Benchmarks
-
-bench-rust: ## Run Rust benchmarks
-	cargo bench -p benchmark $(addprefix --target ,$(GLEAN_BUILD_TARGET))
-
-.PHONY: bench-rust
 
 # Linting
 
@@ -111,10 +118,13 @@ shellcheck: ## Run shellcheck against important shell scripts
 	shellcheck glean-core/ios/sdk_generator.sh
 	shellcheck bin/check-artifact.sh
 
-lint-python: python-setup ## Run flake8 and black to lint Python code
-	$(GLEAN_PYENV)/bin/python3 -m flake8 glean-core/python/glean glean-core/python/tests
-	$(GLEAN_PYENV)/bin/python3 -m black --check --exclude \(\.venv.\*\)\|\(.eggs\)\|_uniffi.py glean-core/python/glean glean-core/python/tests
+lint-python: setup-python ## Run ruff and mypy to lint Python code
+	$(GLEAN_PYENV)/bin/python3 -m ruff format --diff glean-core/python/glean glean-core/python/tests
+	$(GLEAN_PYENV)/bin/python3 -m ruff check glean-core/python/glean glean-core/python/tests
 	$(GLEAN_PYENV)/bin/python3 -m mypy glean-core/python/glean
+
+lint-python-fix: setup-python ## Run ruff and mypy to lint Python code
+	$(GLEAN_PYENV)/bin/python3 -m ruff check --fix glean-core/python/glean glean-core/python/tests
 
 .PHONY: lint-rust lint-kotlin lint-swift lint-yaml
 
@@ -123,28 +133,31 @@ lint-python: python-setup ## Run flake8 and black to lint Python code
 fmt-rust: ## Format all Rust code
 	cargo fmt --all
 
-fmt-python: python-setup ## Run black to format Python code
-	$(GLEAN_PYENV)/bin/python3 -m black --exclude \(\.venv.\*\)\|\(.eggs\)\|_uniffi.py glean-core/python/glean glean-core/python/tests
+fmt-python: setup-python ## Run ruff to format Python code
+	$(GLEAN_PYENV)/bin/python3 -m ruff format glean-core/python/glean glean-core/python/tests
 
-.PHONY: fmt-rust fmt-python
+fmt-kotlin:  ## Run ktlint to format KOtlin code
+	./gradlew ktlintFormat
+
+.PHONY: fmt-rust fmt-python fmt-kotlin
 
 # Docs
 
-docs: rust-docs ## Build the Rust API documentation
+docs: docs-rust ## Build the Rust API documentation
 
-rust-docs: ## Build the Rust documentation
+docs-rust: ## Build the Rust documentation
 	bin/build-rust-docs.sh
 
-swift-docs: ## Build the Swift documentation
+docs-swift: ## Build the Swift documentation
 	bin/build-swift-docs.sh
 
-python-docs: build-python ## Build the Python documentation
+docs-python: build-python ## Build the Python documentation
 	$(GLEAN_PYENV)/bin/python3 -m pdoc --html glean --force -o build/docs/python --config show_type_annotations=True
 
-.PHONY: docs rust-docs swift-docs
+.PHONY: docs docs-rust docs-swift
 
-metrics-docs: python-setup ## Build the internal metrics documentation
-	$(GLEAN_PYENV)/bin/pip install glean_parser~=6.4
+docs-metrics: setup-python ## Build the internal metrics documentation
+	$(GLEAN_PYENV)/bin/pip install glean_parser~=16.1
 	$(GLEAN_PYENV)/bin/glean_parser translate --allow-reserved \
 		 -f markdown \
 		 -o ./docs/user/user/collected-metrics \
@@ -157,7 +170,7 @@ linkcheck: docs linkcheck-raw  ## Run link-checker on the generated docs
 
 linkcheck-raw:
 	# Requires https://www.npmjs.com/package/link-checker
-	link-checker \
+	npx link-checker \
 		build/docs \
     --disable-external true \
     --allow-hash-href true \
@@ -182,21 +195,8 @@ android-emulator: ## Start the Android emulator with a predefined image
 	$(ANDROID_HOME)/emulator/emulator -avd Nexus_5X_API_P -netdelay none -netspeed full
 .PHONY: android-emulator
 
-rust-coverage: export CARGO_INCREMENTAL=0
-rust-coverage: export RUSTFLAGS=-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zno-landing-pads
-rust-coverage: export RUSTUP_TOOLCHAIN=nightly
-rust-coverage: ## Generate code coverage information for Rust code
-	# Expects a Rust nightly toolchain to be available.
-	# Expects grcov and genhtml to be available in $PATH.
-	cargo build --verbose $(addprefix --target ,$(GLEAN_BUILD_TARGET))
-	cargo test --verbose $(addprefix --target ,$(GLEAN_BUILD_TARGET))
-	zip -0 ccov.zip `find . \( -name "glean*.gc*" \) -print`
-	grcov ccov.zip -s . -t lcov --llvm --branch --ignore-not-existing --ignore "/*" -o lcov.info
-	genhtml -o report/ --show-details --highlight --ignore-errors source --legend lcov.info
-.PHONY: rust-coverage
-
-python-coverage: build-python ## Generate a code coverage report for Python
+coverage-python: build-python ## Generate a code coverage report for Python
 	GLEAN_COVERAGE=1 $(GLEAN_PYENV)/bin/python3 -m coverage run --parallel-mode -m pytest
 	$(GLEAN_PYENV)/bin/python3 -m coverage combine
 	$(GLEAN_PYENV)/bin/python3 -m coverage html
-.PHONY: python-coverage
+.PHONY: coverage-python

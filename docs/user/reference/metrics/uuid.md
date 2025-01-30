@@ -79,7 +79,7 @@ user.clientId.generateAndSet();
 **C++**
 
 ```c++
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/TelemetryMetrics.h"
 
 // Generate a new UUID and record it.
 mozilla::glean::user::client_id.GenerateAndSet();
@@ -172,7 +172,7 @@ user.clientId.set(uuid);
 **C++**
 
 ```c++
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/TelemetryMetrics.h"
 
 // Set a specific value.
 nsCString kUuid("decafdec-afde-cafd-ecaf-decafdecafde");
@@ -203,6 +203,8 @@ Glean.user.clientId.set(uuid);
 Gets the recorded value for a given UUID metric.  
 Returns a UUID if data is stored.  
 Returns a language-specific empty/null value if no data is stored.
+Has an optional argument to specify the name of the ping you wish to retrieve data from, except
+in Rust where it's required. `None` or no argument will default to the first value found for `send_in_pings`.
 
 {{#include ../../../shared/tab_header.md}}
 
@@ -276,7 +278,7 @@ assert(uuid, await user.clientId.testGetValue());
 **C++**
 
 ```c++
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/TelemetryMetrics.h"
 
 // Is it clear of errors?
 ASSERT_TRUE(mozilla::glean::user::client_id.TestGetValue().isOk());
@@ -418,6 +420,5 @@ N/A
 ## Reference
 
 * [Swift API docs](../../../swift/Classes/UuidMetricType.html)
-* [Python API docs](../../../python/glean/metrics/uuid.html)
+* [Python API docs](../../../python/glean/metrics/index.html#glean.metrics.UuidMetricType)
 * [Rust API docs](../../../docs/glean/private/uuid/struct.UuidMetric.html)
-* [JavaScript API docs](https://mozilla.github.io/glean.js/classes/core_metrics_types_uuid.default.html#set)

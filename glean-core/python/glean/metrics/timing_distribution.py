@@ -65,6 +65,24 @@ class TimingDistributionMetricType:
         """
         self._inner.cancel(timer_id)
 
+    def accumulate_samples(self, samples: list) -> None:
+        """
+        Accumulates the provided samples in the metric.
+
+        Args:
+            samples: The list holding the samples to be recorded by the metric.
+        """
+        self._inner.accumulate_samples(samples)
+
+    def accumulate_single_sample(self, sample: int) -> None:
+        """
+        Accumulates a single sample and appends it to the metric.
+
+        Args:
+            sample: The single sample to be recorded by the metric.
+        """
+        self._inner.accumulate_single_sample(sample)
+
     class _TimingDistributionContextManager:
         """
         A context manager for recording timings. Used by the `measure` method.
@@ -96,9 +114,7 @@ class TimingDistributionMetricType:
         """
         return self._TimingDistributionContextManager(self)
 
-    def test_get_value(
-        self, ping_name: Optional[str] = None
-    ) -> Optional[DistributionData]:
+    def test_get_value(self, ping_name: Optional[str] = None) -> Optional[DistributionData]:
         """
         Returns the stored value for testing purposes only.
 

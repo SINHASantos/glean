@@ -7,7 +7,12 @@ import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.Task
-import org.gradle.api.artifacts.transform.ArtifactTransform
+import org.gradle.api.artifacts.transform.TransformAction
+import org.gradle.api.artifacts.transform.TransformParameters
+import org.gradle.api.artifacts.transform.TransformOutputs
+import org.gradle.api.artifacts.transform.InputArtifact
+import org.gradle.api.provider.Provider
+import org.gradle.api.file.FileSystemLocation
 import org.gradle.api.artifacts.ComponentMetadataRule
 import org.gradle.api.artifacts.ComponentMetadataContext
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
@@ -28,23 +33,27 @@ import java.util.concurrent.Semaphore
  * A helper class to extract metrics.yaml files from AAR files.
  */
 @SuppressWarnings("GrPackage")
-class GleanMetricsYamlTransform extends ArtifactTransform {
-    List<File> transform(File file) {
+abstract class GleanMetricsYamlTransform implements TransformAction<TransformParameters.None> {
+    @InputArtifact
+    abstract Provider<FileSystemLocation> getInputArtifact()
+
+    @Override
+    void transform(TransformOutputs outputs) {
+        def file = inputArtifact.get().asFile
         def f = new File(file, "metrics.yaml")
         if (f.exists()) {
-            return [f]
+            outputs.file(f)
         }
-        return []
     }
 }
 
 @SuppressWarnings("GrPackage")
 class GleanPlugin implements Plugin<Project> {
     // The version of glean_parser to install from PyPI.
-    private String GLEAN_PARSER_VERSION = "6.4"
+    private String GLEAN_PARSER_VERSION = "16.1"
     // The version of Miniconda is explicitly specified.
     // Miniconda3-4.5.12 is known to not work on Windows.
-    private String MINICONDA_VERSION = "4.5.11"
+    private String MINICONDA_VERSION = "24.3.0-0"
 
     private String TASK_NAME_PREFIX = "gleanGenerateMetrics"
 
@@ -160,6 +169,11 @@ except:
      */
     def setupTasks(Project project, File envDir, boolean isApplication, String parserVersion) {
         return { variant ->
+            // Get the name of the package as if it were to be used in the R or BuildConfig
+            // files. This is required since applications can define different application ids
+            // depending on the variant type: the generated API definitions don't need to be
+            // different due to that.
+            def namespaceProvider = variant.getGenerateBuildConfigProvider().map({ p -> "namespace=${p.namespace.get()}.GleanMetrics" })
             def sourceOutputDir = "${project.buildDir}/generated/source/glean/${variant.dirName}/kotlin"
 
             def generateKotlinAPI = project.task("${TASK_NAME_PREFIX}SourceFor${variant.name.capitalize()}", type: Exec) {
@@ -234,40 +248,24 @@ except:
                 }
 
                 doFirst {
-                    // Get the name of the package as if it were to be used in the R or BuildConfig
-                    // files. This is required since applications can define different application ids
-                    // depending on the variant type: the generated API definitions don't need to be
-                    // different due to that.
-                    // Note that this needs to be done at evaluation time rather than configuration
-                    // time, otherwise the `namespace` property won't be available.
-                    TaskProvider buildConfigProvider = variant.getGenerateBuildConfigProvider()
-                    def configProvider = buildConfigProvider.get()
-                    def originalPackageName
-                    // In Gradle 6.x `getBuildConfigPackageName` was reaplced by `namespace`.
-                    // We want to be forward compatible, so we check that first or fallback to the old method.
-                    if (configProvider.hasProperty("namespace")) {
-                        originalPackageName = configProvider.namespace.get()
-                    } else {
-                        originalPackageName = configProvider.getBuildConfigPackageName().get()
-                    }
 
                     args "-s"
-                    args "namespace=${originalPackageName}.GleanMetrics"
+                    args namespaceProvider.get().toString()
 
                     // Add the potential 'metrics.yaml' files at evaluation-time, rather than
                     // configuration-time. Otherwise the Gradle build will fail.
                     inputs.files.forEach { file ->
-                        project.logger.lifecycle("Glean SDK - generating API from ${file.path}")
+                        logger.lifecycle("Glean SDK - generating API from ${file.path}")
                         args file.path
                     }
                 }
 
                 // Only show the output if something went wrong.
                 ignoreExitValue = true
-                standardOutput = new ByteArrayOutputStream()
-                errorOutput = standardOutput
+                standardOutput = System.out
+                errorOutput = System.err
                 doLast {
-                    if (execResult.exitValue != 0) {
+                    if (executionResult.get().exitValue != 0) {
                         throw new GradleException("Glean code generation failed.\n\n${standardOutput.toString()}")
                     }
                 }
@@ -341,7 +339,7 @@ except:
                 standardOutput = new ByteArrayOutputStream()
                 errorOutput = standardOutput
                 doLast {
-                    if (execResult.exitValue != 0) {
+                    if (executionResult.get().exitValue != 0) {
                         throw new GradleException("Glean documentation generation failed.\n\n${standardOutput.toString()}")
                     }
                 }
@@ -478,16 +476,16 @@ except:
 
                 // If we have a git package (a la `git+https://github.com`) we install that.
                 if (parserVersion.matches("git.+")) {
-                    conda "Miniconda3", "Miniconda3-${MINICONDA_VERSION}", "64", [parserVersion]
+                    conda "Miniconda3", "Miniconda3-py311_${MINICONDA_VERSION}", "64", [parserVersion]
                 } else {
-                    conda "Miniconda3", "Miniconda3-${MINICONDA_VERSION}", "64", ["glean_parser~=${parserVersion}"]
+                    conda "Miniconda3", "Miniconda3-py311_${MINICONDA_VERSION}", "64", ["glean_parser~=${parserVersion}"]
                 }
             }
             File envDir = new File(
                 condaBootstrapDir,
                 "Miniconda3"
             )
-            project.tasks.whenTaskAdded { task ->
+            project.tasks.configureEach { task ->
                 if (task.name.startsWith('Bootstrap_CONDA')) {
                     task.dependsOn(createBuildDir)
 
@@ -525,19 +523,14 @@ except:
         // Gradle composite build.
         if (project.ext.has("allowMetricsFromAAR")) {
             project.dependencies {
-                registerTransform { reg ->
+                registerTransform(GleanMetricsYamlTransform) {
                     // The type here should be
                     // `com.android.build.gradle.internal.publishing.AndroidArtifacts.ArtifactType.EXPLODED_AAR.getType())`,
                     // but there's no good way to access the including script's classpath from `apply from:`
                     // scripts. See https://stackoverflow.com/a/37060550. The 'android-exploded-aar' string is
                     // very unlikely to change, so it's just hard-coded.
-                    reg.getFrom().attribute(
-                            ArtifactAttributes.ARTIFACT_FORMAT,
-                            'android-exploded-aar')
-                    reg.getTo().attribute(
-                            ArtifactAttributes.ARTIFACT_FORMAT,
-                            'glean-metrics-yaml')
-                    reg.artifactTransform(GleanMetricsYamlTransform.class)
+                    from.attribute(ArtifactAttributes.ARTIFACT_FORMAT, "android-exploded-aar")
+                    to.attribute(ArtifactAttributes.ARTIFACT_FORMAT, "glean-metrics-yaml")
                 }
             }
         }
@@ -555,19 +548,24 @@ except:
     void apply(Project project) {
         isOffline = project.gradle.startParameter.offline
 
-        project.ext.glean_version = "51.8.3"
+        project.ext.glean_version = "63.1.0"
         def parserVersion = gleanParserVersion(project)
 
         // Print the required glean_parser version to the console. This is
         // offline builds, and is mentioned in the documentation for offline
         // builds.
-        println("Requires ${parserVersion}")
+        println("Requires glean_parser ${parserVersion}")
 
-        File envDir = setupPythonEnvironmentTasks(project, parserVersion)
-        // Store in both gleanCondaDir (for backward compatibility reasons) and
-        // the more accurate gleanPythonEnvDir variables.
-        project.ext.set("gleanCondaDir", envDir)
-        project.ext.set("gleanPythonEnvDir", envDir)
+        File envDir
+        if (project.ext.has("gleanPythonEnvDir")) {
+            envDir = new File(project.ext.gleanPythonEnvDir)
+            isOffline = true
+        } else {
+            envDir = setupPythonEnvironmentTasks(project, parserVersion)
+            project.ext.set("gleanPythonEnvDir", envDir)
+        }
+        // Also store in gleanCondaDir for backward compatibility reasons
+        project.ext.set("gleanCondaDir", project.ext.gleanPythonEnvDir)
 
         setupExtractMetricsFromAARTasks(project)
 

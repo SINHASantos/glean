@@ -82,7 +82,7 @@ stability.crashCount["native_code_crash"].add(3);
 
 **C++**
 ```cpp
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/CrashesMetrics.h"
 
 mozilla::glean::stability::crash_count.Get("uncaught_exception"_ns).Add(1);
 mozilla::glean::stability::crash_count.Get("native_code_crash"_ns).Add(3);
@@ -99,7 +99,8 @@ Glean.stability.crashCount["native_code_crash"].add(3);
 
 #### Recorded Errors
 
-* [`invalid_value`](../../user/metrics/error-reporting.md): if the counter is incremented by `0` or a negative value.
+* [`invalid_value`](../../user/metrics/error-reporting.md): if the counter is incremented by a negative value
+  (or, in versions up to and including 54.0.0, `0`).
 * [`invalid_type`](../../user/metrics/error-reporting.md): if a floating point or non-number value is given.
 {{#include ../../_includes/label-errors.md}}
 
@@ -116,6 +117,8 @@ Glean.stability.crashCount["native_code_crash"].add(3);
 Gets the recorded value for a given label in a labeled counter metric.  
 Returns the count if data is stored.  
 Returns a language-specific empty/null value if no data is stored.
+Has an optional argument to specify the name of the ping you wish to retrieve data from, except
+in Rust where it's required. `None` or no argument will default to the first value found for `send_in_pings`.
 
 {{#include ../../../shared/tab_header.md}}
 
@@ -188,7 +191,7 @@ assert.strictEqual(3, await stability.crashCount["native_code_crash"].testGetVal
 
 **C++**
 ```cpp
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/CrashesMetrics.h"
 
 ASSERT_EQ(
     1,
@@ -329,6 +332,5 @@ accessibility:
 ## Reference
 
 * Swift API docs: [`LabeledMetricType`](../../../swift/Classes/LabeledMetricType.html), [`CounterMetricType`](../../../swift/Classes/CounterMetricType.html)
-* Python API docs: [`LabeledMetricBase`](../../../python/glean/metrics/labeled.html), [`CounterMetricType`](../../../python/glean/metrics/counter.html)
+* Python API docs: [`LabeledCounterMetricType`](../../../python/glean/metrics/labeled.html#glean.metrics.labeled.LabeledCounterMetricType), [`CounterMetricType`](../../../python/glean/metrics/index.html#glean.metrics.CounterMetric)
 * Rust API docs: [`LabeledMetric`](../../../docs/glean/private/struct.LabeledMetric.html), [`CounterMetricType`](../../../docs/glean/private/struct.CounterMetric.html)
-* JavaScript API docs: [`LabeledMetricType`](https://mozilla.github.io/glean.js/classes/core_metrics_types_labeled.default.html), [`CounterMetricType`](https://mozilla.github.io/glean.js/classes/core_metrics_types_counter.default.html)

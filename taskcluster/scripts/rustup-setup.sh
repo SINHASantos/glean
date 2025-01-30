@@ -11,6 +11,7 @@ export RUSTFLAGS='-Dwarnings'
 export CARGO_INCREMENTAL='0'
 export CI='1'
 export RUST_LOG='glean_core=debug,glean_ffi=debug'
+export CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 
 # Rust
 RUSTUP_PLATFORM='x86_64-unknown-linux-gnu'

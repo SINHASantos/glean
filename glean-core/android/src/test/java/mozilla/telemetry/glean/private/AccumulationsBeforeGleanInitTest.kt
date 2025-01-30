@@ -28,11 +28,19 @@ class AccumulationsBeforeGleanInitTest {
     val context: Context
         get() = ApplicationProvider.getApplicationContext()
 
-    @After
     @Before
-    fun cleanup() {
+    fun setup() {
         Glean.testDestroyGleanHandle()
         WorkManagerTestInitHelper.initializeTestWorkManager(context)
+    }
+
+    @After
+    fun cleanup() {
+        Glean.testDestroyGleanHandle()
+
+        // This closes the database to help prevent leaking it during tests.
+        // See Bug1719905 for more info.
+        WorkManagerTestInitHelper.closeWorkDatabase()
     }
 
     private fun forceInitGlean() {
@@ -48,8 +56,8 @@ class AccumulationsBeforeGleanInitTest {
                 category = "test.telemetry",
                 lifetime = Lifetime.APPLICATION,
                 name = "pre_init_counter",
-                sendInPings = listOf("metrics")
-            )
+                sendInPings = listOf("metrics"),
+            ),
         )
 
         val labeledCounterMetric = LabeledMetricType(
@@ -58,7 +66,7 @@ class AccumulationsBeforeGleanInitTest {
             lifetime = Lifetime.APPLICATION,
             name = "pre_init_counter",
             sendInPings = listOf("metrics"),
-            subMetric = counterMetric
+            subMetric = counterMetric,
         )
 
         labeledCounterMetric["label1"].add(1)

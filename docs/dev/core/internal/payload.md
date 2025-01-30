@@ -59,8 +59,16 @@ A [String](../../../book/reference/metrics/string.md) is represented by its stri
 
 A [String List](../../../book/reference/metrics/string_list.md) is represented as an array of strings.
 
+#### Example
+
 ```json
 ["sample string", "another one"]
+```
+
+An empty list is accepted and sent as:
+
+```json
+[]
 ```
 
 ### Timespan
@@ -287,4 +295,45 @@ A [Rate](../../../book/reference/metrics/rate.md) is represented by its `numerat
     "numerator": 22,
     "denominator": 7,
 }
+```
+
+### Text
+
+A [Text](../../../book/reference/metrics/text.md) is represented by its string value.
+
+#### Example
+
+```json
+"sample string"
+```
+
+### Object
+
+An [Object](../../../book/reference/metrics/object.md) is represented as either a JSON array or JSON object,
+depending on the allowed structure.
+Missing values (`null`) and empty arrays will not be serialized in the payload.
+
+#### Example
+
+Object:
+
+```json
+{
+  "colour": "red",
+  "diameter": 5
+}
+```
+
+Array with objects:
+
+```json
+[
+  {
+    "type": "ERROR",
+    "address": "0x000000"
+  },
+  {
+    "type": "ERROR"
+  }
+]
 ```

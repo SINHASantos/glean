@@ -35,11 +35,11 @@
 //! You can then access your metrics and pings directly by name within the `metrics` module.
 //!
 //! [`glean-parser`]: https://github.com/mozilla/glean_parser/
-use std::env;
+use std::{env, path::PathBuf};
 
 use xshell_venv::{Result, Shell, VirtualEnv};
 
-const GLEAN_PARSER_VERSION: &str = "6.4.0";
+const GLEAN_PARSER_VERSION: &str = "16.1.0";
 
 /// A Glean Rust bindings generator.
 pub struct Builder {
@@ -107,13 +107,22 @@ impl Builder {
         }
 
         let sh = Shell::new()?;
-        let venv = VirtualEnv::new(&sh, "py3-glean_parser")?;
+        let venv = if let Ok(env_dir) = env::var("GLEAN_PYTHON_VENV_DIR") {
+            eprintln!("got env dir: {env_dir}");
+            let env_path = PathBuf::from(env_dir);
+            VirtualEnv::with_path(&sh, &env_path)?
+        } else {
+            let venv = VirtualEnv::new(&sh, "py3-glean_parser")?;
 
-        let glean_parser = format!("glean_parser~={}", GLEAN_PARSER_VERSION);
-        venv.pip_install(&glean_parser)?;
+            let glean_parser = format!("glean_parser~={GLEAN_PARSER_VERSION}");
+            // TODO: Remove after we switched glean_parser away from legacy setup.py
+            venv.pip_install("setuptools")?;
+            venv.pip_install(&glean_parser)?;
+            venv
+        };
 
         for file in &self.files {
-            println!("cargo:rerun-if-changed={}", file);
+            println!("cargo:rerun-if-changed={file}");
         }
 
         let mut args = vec!["translate", "--format", "rust", "--output", out_dir];
@@ -121,5 +130,39 @@ impl Builder {
         venv.run_module("glean_parser", &args)?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::{env, fs, path::PathBuf};
+
+    use super::*;
+
+    #[test]
+    fn test_builder() {
+        // We know this package's location, and it's up 2 folders from there.
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let package_root = manifest_dir.parent().unwrap().parent().unwrap();
+        // Ensure xshell-venv create the venv in the expected directory.
+        env::set_var(
+            "CARGO_TARGET_DIR",
+            package_root.join("target").display().to_string(),
+        );
+
+        // clean out the previous venv, if it exists
+        let venv_dir = package_root.join("target").join("venv-py3-glean_parser");
+        if venv_dir.exists() {
+            fs::remove_dir_all(venv_dir).unwrap();
+        }
+        let metrics_yaml = package_root
+            .join("samples")
+            .join("rust")
+            .join("metrics.yaml");
+        let out_dir = tempfile::tempdir().unwrap();
+        Builder::with_output(out_dir.path().to_string_lossy())
+            .file(metrics_yaml.to_string_lossy())
+            .generate()
+            .expect("Error generating Glean bindings");
     }
 }

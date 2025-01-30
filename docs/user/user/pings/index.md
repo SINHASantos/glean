@@ -16,16 +16,19 @@ that are assembled out of the box without any developer intervention.
 Every ping payload has the following keys at the top-level:
 
 - The [`ping_info` section](#the-ping_info-section) contains core metadata
-  that is included in **every** ping.
+  that is included in every ping that doesn't set the
+  `metadata.include_info_sections` property to `false`.
 
 - The [`client_info` section](#the-client_info-section) contains information that identifies the client.
-  It is included in most pings (including all built-in pings), but may be excluded from pings
-  where we don't want to connect client information with the other metrics in the ping.
+  It is included in every ping that doesn't set the
+  `metadata.include_info_sections` property to `false`.
+  When included, it contains a persistent client identifier `client_id`,
+  except when the `include_client_id` property is set to `false`.
 
 The following keys are only present if any metrics or events were recorded for the given ping:
 
 - The `metrics` section contains the submitted values for all metric types
-  except for [events](../metrics/event.md). It has keys for each of the metric types,
+  except for [events](../../reference/metrics/event.md). It has keys for each of the metric types,
   under which is data for each metric.
 
 - The `events` section contains the events recorded in the ping.
@@ -36,7 +39,8 @@ for more details for each metric type in the `metrics` and `events` section.
 ### The `ping_info` section
 
 Metadata about the ping itself.
-This section is included in **every** ping.
+This section is included in every ping that doesn't set the
+`metadata.include_info_sections` property to `false`.
 
 The following fields are included in the `ping_info` section.
 Optional fields are marked accordingly.
@@ -54,16 +58,18 @@ _Type: [Datetime](../../reference/metrics/datetime.md),
 Lifetime: [User](../../reference/yaml/metrics.md#user)_
 
 The time of the start of collection of the data in the ping, in local time
-and with minute precision, including timezone information.
+and with millisecond precision (by default), including timezone information.
+(_Note_: Custom pings can opt-out of precise timestamps and use minute precision.)
 
 #### `end_time`
 
 _Type: [Datetime](../../reference/metrics/datetime.md),
 Lifetime: [Ping](../../reference/yaml/metrics.md#ping-default)_
 
-The time of the end of collection of the data in the ping, in local time and with minute precision,
-including timezone information. This is also the time this ping was generated
-and is likely well before ping transmission time.
+The time of the end of collection of the data in the ping, in local time
+and with millisecond precision (by default), including timezone information.
+This is also the time this ping was generated and is likely well before ping transmission time.
+(_Note_: Custom pings can opt-out of precise timestamps and use minute precision.)
 
 #### `reason` _(optional)_
 
@@ -100,6 +106,9 @@ A limited amount of metrics that are generally useful across products.
 The data is provided by the embedding application or automatically fetched by the Glean SDK.
 It is collected at initialization time and sent in every ping afterwards.
 For historical reasons it contains metrics that are only useful on a certain platform.
+
+This section is included in every ping that doesn't set the
+`metadata.include_info_sections` property to `false`.
 
 {{#include ../../../shared/blockquote-info.html}}
 
@@ -202,6 +211,13 @@ _Type: [String](../../reference/metrics/string.md),
 Lifetime: [Application](../../reference/yaml/metrics.md#application)_
 
 The Android specific SDK version of the software running on this hardware device (e.g. "23").
+
+#### `windows_build_number` _(optional_)
+
+_Type: [Quantity](../../reference/metrics/quantity.md),
+Lifetime: [Application](../../reference/yaml/metrics.md#application)_
+
+The optional Windows build number, reported by Windows (e.g. `22000)` and not set for other platforms.
 
 #### `telemetry_sdk_build`
 

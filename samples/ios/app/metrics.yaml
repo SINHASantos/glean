@@ -28,6 +28,9 @@ browser.engagement:
       key2:
         type: string
         description: "This is key two"
+      And1WithUnusualCASING:
+        type: boolean
+        description: "This is key three"
     expires: 2100-01-01
     no_lint:
       - EXPIRATION_DATE_TOO_FAR
@@ -166,3 +169,49 @@ legacy_ids:
     expires: 2100-01-01
     no_lint:
       - EXPIRATION_DATE_TOO_FAR
+
+party:
+  balloons:
+    type: object
+    description: A collection of balloons
+    bugs:
+      - https://bugzilla.mozilla.org/TODO
+    data_reviews:
+      - http://example.com/reviews
+    notification_emails:
+      - CHANGE-ME@example.com
+    expires: never
+    send_in_pings:
+      - sample
+    structure:
+      type: array
+      items:
+        type: object
+        properties:
+          colour:
+            type: string
+          diameter:
+            type: number
+          labels:
+            type: array
+            items:
+              type: string
+  animals:
+    type: object
+    description: >
+      Contains a list of party animals
+    notification_emails:
+      - CHANGE-ME@example.com
+    bugs:
+      - https://bugzilla.mozilla.org/TODO
+    data_reviews:
+      - http://example.com/reviews
+    data_sensitivity:
+      - technical
+    expires: never
+    send_in_pings:
+      - sample
+    structure:
+      type: array
+      items:
+        type: string

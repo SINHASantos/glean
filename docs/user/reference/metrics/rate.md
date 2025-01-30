@@ -184,7 +184,7 @@ network.httpConnectionError.addToDenominator(1);
 **C++**
 
 ```cpp
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/NetwerkProtocolHttpMetrics.h"
 
 if (aHadError) {
 mozilla::glean::network::http_connection_error.AddToNumerator(1);
@@ -221,6 +221,8 @@ Glean.network.httpConnectionError.addToDenominator(1);
 Gets the recorded value for a given rate metric.  
 Returns the numerator/denominator pair if data is stored.  
 Returns a language-specific empty/null value if no data is stored.
+Has an optional argument to specify the name of the ping you wish to retrieve data from, except
+in Rust where it's required. `None` or no argument will default to the first value found for `send_in_pings`.
 
 {{#include ../../../shared/tab_header.md}}
 <div data-lang="Kotlin" class="tab">
@@ -288,7 +290,7 @@ assert.strictEqual(denominator, 1);
 **C++**
 
 ```cpp
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/NetwerkProtocolHttpMetrics.h"
 
 auto pair = mozilla::glean::network::http_connection_error.TestGetValue().unwrap();
 ASSERT_EQ(1, pair.first);

@@ -6,12 +6,11 @@
 // the lib.rs file.
 
 use std::collections::HashSet;
-use std::iter::FromIterator;
 
+use internal_pings::InternalPings;
 use serde_json::json;
 
 use super::*;
-use crate::metrics::{StringMetric, TimeUnit, TimespanMetric, TimingDistributionMetric};
 
 const GLOBAL_APPLICATION_ID: &str = "org.mozilla.glean.test.app";
 pub fn new_glean(tempdir: Option<tempfile::TempDir>) -> (Glean, tempfile::TempDir) {
@@ -21,13 +20,41 @@ pub fn new_glean(tempdir: Option<tempfile::TempDir>) -> (Glean, tempfile::TempDi
         None => tempfile::tempdir().unwrap(),
     };
     let tmpname = dir.path().display().to_string();
-    let glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true);
+    let mut glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true, true);
+    // Register the builtin pings as enabled.
+    _ = InternalPings::new(true);
+
+    // store{1, 2} is used throughout tests
+    let ping = PingType::new_internal(
+        "store1",
+        true,
+        false,
+        true,
+        true,
+        true,
+        vec![],
+        vec![],
+        true,
+    );
+    glean.register_ping_type(&ping);
+    let ping = PingType::new_internal(
+        "store2",
+        true,
+        false,
+        true,
+        true,
+        true,
+        vec![],
+        vec![],
+        true,
+    );
+    glean.register_ping_type(&ping);
     (glean, dir)
 }
 
 #[test]
 fn path_is_constructed_from_data() {
-    let (glean, _) = new_glean(None);
+    let (glean, _t) = new_glean(None);
 
     assert_eq!(
         "/submit/org-mozilla-glean-test-app/baseline/1/this-is-a-docid",
@@ -41,7 +68,7 @@ fn path_is_constructed_from_data() {
 fn experiment_id_and_branch_get_truncated_if_too_long() {
     let t = tempfile::tempdir().unwrap();
     let name = t.path().display().to_string();
-    let glean = Glean::with_options(&name, "org.mozilla.glean.tests", true);
+    let glean = Glean::with_options(&name, "org.mozilla.glean.tests", true, true);
 
     // Generate long strings for the used ids.
     let very_long_id = "test-experiment-id".repeat(10);
@@ -82,7 +109,7 @@ fn experiment_id_and_branch_get_truncated_if_too_long() {
 fn limits_on_experiments_extras_are_applied_correctly() {
     let t = tempfile::tempdir().unwrap();
     let name = t.path().display().to_string();
-    let glean = Glean::with_options(&name, "org.mozilla.glean.tests", true);
+    let glean = Glean::with_options(&name, "org.mozilla.glean.tests", true, true);
 
     let experiment_id = "test-experiment_id".to_string();
     let branch_id = "test-branch-id".to_string();
@@ -138,7 +165,7 @@ fn limits_on_experiments_extras_are_applied_correctly() {
 fn experiments_status_is_correctly_toggled() {
     let t = tempfile::tempdir().unwrap();
     let name = t.path().display().to_string();
-    let glean = Glean::with_options(&name, "org.mozilla.glean.tests", true);
+    let glean = Glean::with_options(&name, "org.mozilla.glean.tests", true, true);
 
     // Define the experiment's data.
     let experiment_id: String = "test-toggle-experiment".into();
@@ -178,11 +205,52 @@ fn experiments_status_is_correctly_toggled() {
 }
 
 #[test]
+fn experimentation_id_is_set_correctly() {
+    let t = tempfile::tempdir().unwrap();
+    let name = t.path().display().to_string();
+
+    // Define an experimentation id to test
+    let experimentation_id = "test-experimentation-id";
+
+    let glean = Glean::new(InternalConfiguration {
+        data_path: name,
+        application_id: GLOBAL_APPLICATION_ID.into(),
+        language_binding_name: "Rust".into(),
+        upload_enabled: true,
+        max_events: None,
+        delay_ping_lifetime_io: false,
+        app_build: "Unknown".into(),
+        use_core_mps: false,
+        trim_data_to_registered_pings: false,
+        log_level: None,
+        rate_limit: None,
+        enable_event_timestamps: true,
+        experimentation_id: Some(experimentation_id.to_string()),
+        enable_internal_pings: true,
+        ping_schedule: Default::default(),
+        ping_lifetime_threshold: 0,
+        ping_lifetime_max_time: 0,
+    })
+    .unwrap();
+
+    // Check that the correct value was stored
+    if let Some(exp_id) = glean
+        .additional_metrics
+        .experimentation_id
+        .get_value(&glean, "all-pings")
+    {
+        assert_eq!(exp_id, experimentation_id, "Experimentation ids must match");
+    } else {
+        panic!("The experimentation id must not be `None`");
+    }
+}
+
+#[test]
 fn client_id_and_first_run_date_must_be_regenerated() {
     let dir = tempfile::tempdir().unwrap();
     let tmpname = dir.path().display().to_string();
     {
-        let glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true);
+        let glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true, true);
 
         glean.data_store.as_ref().unwrap().clear_all();
 
@@ -199,7 +267,7 @@ fn client_id_and_first_run_date_must_be_regenerated() {
     }
 
     {
-        let glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true);
+        let glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true, true);
         assert!(glean
             .core_metrics
             .client_id
@@ -241,7 +309,7 @@ fn basic_metrics_should_be_cleared_when_uploading_is_disabled() {
 
 #[test]
 fn first_run_date_is_managed_correctly_when_toggling_uploading() {
-    let (mut glean, _) = new_glean(None);
+    let (mut glean, _t) = new_glean(None);
 
     let original_first_run_date = glean
         .core_metrics
@@ -269,7 +337,7 @@ fn first_run_date_is_managed_correctly_when_toggling_uploading() {
 
 #[test]
 fn client_id_is_managed_correctly_when_toggling_uploading() {
-    let (mut glean, _) = new_glean(None);
+    let (mut glean, _t) = new_glean(None);
 
     let original_client_id = glean
         .core_metrics
@@ -302,7 +370,7 @@ fn client_id_is_managed_correctly_when_toggling_uploading() {
 fn client_id_is_set_to_known_value_when_uploading_disabled_at_start() {
     let dir = tempfile::tempdir().unwrap();
     let tmpname = dir.path().display().to_string();
-    let glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, false);
+    let glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, false, true);
 
     assert_eq!(
         *KNOWN_CLIENT_ID,
@@ -318,7 +386,7 @@ fn client_id_is_set_to_known_value_when_uploading_disabled_at_start() {
 fn client_id_is_set_to_random_value_when_uploading_enabled_at_start() {
     let dir = tempfile::tempdir().unwrap();
     let tmpname = dir.path().display().to_string();
-    let glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true);
+    let glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true, true);
 
     let current_client_id = glean
         .core_metrics
@@ -332,7 +400,7 @@ fn client_id_is_set_to_random_value_when_uploading_enabled_at_start() {
 fn enabling_when_already_enabled_is_a_noop() {
     let dir = tempfile::tempdir().unwrap();
     let tmpname = dir.path().display().to_string();
-    let mut glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true);
+    let mut glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true, true);
 
     assert!(!glean.set_upload_enabled(true));
 }
@@ -341,7 +409,7 @@ fn enabling_when_already_enabled_is_a_noop() {
 fn disabling_when_already_disabled_is_a_noop() {
     let dir = tempfile::tempdir().unwrap();
     let tmpname = dir.path().display().to_string();
-    let mut glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, false);
+    let mut glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, false, true);
 
     assert!(!glean.set_upload_enabled(false));
 }
@@ -362,9 +430,9 @@ fn correct_order() {
     fn discriminant(metric: &metrics::Metric) -> u32 {
         let ser = bincode::serialize(metric).unwrap();
         (ser[0] as u32)
-        | (ser[1] as u32) << 8
-        | (ser[2] as u32) << 16
-        | (ser[3] as u32) << 24
+        | ((ser[1] as u32) << 8)
+        | ((ser[2] as u32) << 16)
+        | ((ser[3] as u32) << 24)
     }
 
     // One of every metric type. The values are arbitrary and don't matter.
@@ -386,6 +454,7 @@ fn correct_order() {
         Jwe("eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ.OKOawDo13gRp2ojaHV7LFpZcgV7T6DVZKTyKOMTYUmKoTCVJRgckCL9kiMT03JGeipsEdY3mx_etLbbWSrFr05kLzcSr4qKAq7YN7e9jwQRb23nfa6c9d-StnImGyFDbSv04uVuxIp5Zms1gNxKKK2Da14B8S4rzVRltdYwam_lDp5XnZAYpQdb76FdIKLaVmqgfwX7XWRxv2322i-vDxRfqNzo_tETKzpVLzfiwQyeyPGLBIO56YJ7eObdv0je81860ppamavo35UgoRdbYaBcoh9QcfylQr66oc6vFWXRcZ_ZT2LawVCWTIy3brGPi6UklfCpIMfIjf7iGdXKHzg.48V1_ALb6US04U3b.5eym8TW_c8SuK0ltJ3rpYIzOeDQz7TALvtu6UG9oMo4vpzs9tX_EFShS8iB7j6jiSdiwkIr3ajwQzaBtQD_A.XFBoMYUZodetZdvTiFvSkQ".into()),
         Rate(0, 0),
         Text(long_string),
+        Object("{}".into()),
     ];
 
     for metric in all_metrics {
@@ -414,6 +483,7 @@ fn correct_order() {
             Rate(..)                          => assert_eq!(14, disc),
             Url(..)                           => assert_eq!(15, disc),
             Text(..)                          => assert_eq!(16, disc),
+            Object(..)                        => assert_eq!(17, disc),
         }
     }
 }
@@ -562,24 +632,25 @@ fn test_first_run() {
     let dir = tempfile::tempdir().unwrap();
     let tmpname = dir.path().display().to_string();
     {
-        let glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true);
+        let glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true, true);
         // Check that this is indeed the first run.
         assert!(glean.is_first_run());
     }
 
     {
         // Other runs must be not marked as "first run".
-        let glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true);
+        let glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true, true);
         assert!(!glean.is_first_run());
     }
 }
 
 #[test]
 fn test_dirty_bit() {
+    let _ = env_logger::builder().try_init();
     let dir = tempfile::tempdir().unwrap();
     let tmpname = dir.path().display().to_string();
     {
-        let glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true);
+        let glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true, true);
         // The dirty flag must not be set the first time Glean runs.
         assert!(!glean.is_dirty_flag_set());
 
@@ -591,7 +662,7 @@ fn test_dirty_bit() {
     {
         // Check that next time Glean runs, it correctly picks up the "dirty flag".
         // It is expected to be 'true'.
-        let glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true);
+        let glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true, true);
         assert!(glean.is_dirty_flag_set());
 
         // Set the dirty flag to false.
@@ -602,7 +673,7 @@ fn test_dirty_bit() {
     {
         // Check that next time Glean runs, it correctly picks up the "dirty flag".
         // It is expected to be 'false'.
-        let glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true);
+        let glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true, true);
         assert!(!glean.is_dirty_flag_set());
     }
 }
@@ -611,7 +682,7 @@ fn test_dirty_bit() {
 fn test_change_metric_type_runtime() {
     let dir = tempfile::tempdir().unwrap();
 
-    let (glean, _) = new_glean(Some(dir));
+    let (glean, _t) = new_glean(Some(dir));
 
     // We attempt to create two metrics: one with a 'string' type and the other
     // with a 'timespan' type, both being sent in the same pings and having the
@@ -670,7 +741,7 @@ fn test_change_metric_type_runtime() {
 fn timing_distribution_truncation() {
     let dir = tempfile::tempdir().unwrap();
 
-    let (glean, _) = new_glean(Some(dir));
+    let (glean, _t) = new_glean(Some(dir));
     let max_sample_time = 1000 * 1000 * 1000 * 60 * 10;
 
     for (unit, expected_keys) in &[
@@ -744,7 +815,7 @@ fn timing_distribution_truncation() {
 fn timing_distribution_truncation_accumulate() {
     let dir = tempfile::tempdir().unwrap();
 
-    let (glean, _) = new_glean(Some(dir));
+    let (glean, _t) = new_glean(Some(dir));
     let max_sample_time = 1000 * 1000 * 1000 * 60 * 10;
 
     for &unit in &[
@@ -790,7 +861,7 @@ fn timing_distribution_truncation_accumulate() {
 fn test_setting_debug_view_tag() {
     let dir = tempfile::tempdir().unwrap();
 
-    let (mut glean, _) = new_glean(Some(dir));
+    let (mut glean, _t) = new_glean(Some(dir));
 
     let valid_tag = "valid-tag";
     assert!(glean.set_debug_view_tag(valid_tag));
@@ -805,7 +876,7 @@ fn test_setting_debug_view_tag() {
 fn test_setting_log_pings() {
     let dir = tempfile::tempdir().unwrap();
 
-    let (mut glean, _) = new_glean(Some(dir));
+    let (mut glean, _t) = new_glean(Some(dir));
     assert!(!glean.log_pings());
 
     glean.set_log_pings(true);
@@ -816,7 +887,7 @@ fn test_setting_log_pings() {
 }
 
 #[test]
-fn test_set_metrics_disabled() {
+fn test_set_remote_metric_configuration() {
     let (glean, _t) = new_glean(None);
     let metric = StringMetric::new(CommonMetricData {
         category: "category".to_string(),
@@ -825,11 +896,13 @@ fn test_set_metrics_disabled() {
         ..Default::default()
     });
     let another_metric = LabeledString::new(
-        CommonMetricData {
-            category: "category".to_string(),
-            name: "labeled_string_metric".to_string(),
-            send_in_pings: vec!["baseline".to_string()],
-            ..Default::default()
+        LabeledMetricData::Common {
+            cmd: CommonMetricData {
+                category: "category".to_string(),
+                name: "labeled_string_metric".to_string(),
+                send_in_pings: vec!["baseline".to_string()],
+                ..Default::default()
+            },
         },
         Some(vec!["label1".into()]),
     );
@@ -852,16 +925,17 @@ fn test_set_metrics_disabled() {
     );
 
     // 2. Set a configuration to disable the metrics
-    let mut metrics_disabled_config = json!(
+    let mut remote_settings_config = json!(
         {
-            "category.string_metric": true,
-            "category.labeled_string_metric": true,
+            "metrics_enabled": {
+                "category.string_metric": false,
+                "category.labeled_string_metric": false,
+            }
         }
     )
     .to_string();
-    glean.set_metrics_disabled_config(
-        MetricsDisabledConfig::try_from(metrics_disabled_config).unwrap(),
-    );
+    glean
+        .apply_server_knobs_config(RemoteSettingsConfig::try_from(remote_settings_config).unwrap());
 
     // 3. Since the metrics were disabled, setting a new value will be ignored
     metric.set_sync(&glean, "VALUE_AFTER_DISABLED");
@@ -882,13 +956,20 @@ fn test_set_metrics_disabled() {
         "Shouldn't set when disabled"
     );
 
-    // 4. Set a new configuration where the metrics are enabled
-    metrics_disabled_config = json!({}).to_string();
-    glean.set_metrics_disabled_config(
-        MetricsDisabledConfig::try_from(metrics_disabled_config).unwrap(),
-    );
+    // 4. Set a new configuration where one metric is enabled
+    remote_settings_config = json!(
+        {
+            "metrics_enabled": {
+                "category.string_metric": true,
+            }
+        }
+    )
+    .to_string();
+    glean
+        .apply_server_knobs_config(RemoteSettingsConfig::try_from(remote_settings_config).unwrap());
 
-    // 5. Since the metrics are now enabled, setting a new value should work
+    // 5. Since the first metric is enabled, setting a new value should work
+    // on it but not the second metric
     metric.set_sync(&glean, "VALUE_AFTER_REENABLED");
     assert_eq!(
         "VALUE_AFTER_REENABLED",
@@ -899,7 +980,39 @@ fn test_set_metrics_disabled() {
         .get("label1")
         .set_sync(&glean, "VALUE_AFTER_REENABLED");
     assert_eq!(
-        "VALUE_AFTER_REENABLED",
+        "TEST_VALUE",
+        another_metric
+            .get("label1")
+            .get_value(&glean, "baseline")
+            .unwrap(),
+        "Should not set if metric config entry unchanged"
+    );
+
+    // 6. Set a new configuration where the second metric is enabled. This
+    // should be merged with the existing configuration and then both
+    // metrics should be enabled at that point.
+    remote_settings_config = json!(
+        {
+            "metrics_enabled": {
+                "category.labeled_string_metric": true,
+            }
+        }
+    )
+    .to_string();
+    glean
+        .apply_server_knobs_config(RemoteSettingsConfig::try_from(remote_settings_config).unwrap());
+
+    // 7. Now both metrics are enabled, setting a new value should work for
+    // both metrics with the merged configurations
+    metric.set_sync(&glean, "FINAL VALUE");
+    assert_eq!(
+        "FINAL VALUE",
+        metric.get_value(&glean, "baseline").unwrap(),
+        "Should set when still enabled"
+    );
+    another_metric.get("label1").set_sync(&glean, "FINAL VALUE");
+    assert_eq!(
+        "FINAL VALUE",
         another_metric
             .get("label1")
             .get_value(&glean, "baseline")
@@ -917,15 +1030,16 @@ fn test_remote_settings_epoch() {
     assert_eq!(0u8, current_epoch, "Current epoch must start at 0");
 
     // 2. Set a configuration which will trigger incrementing the epoch
-    let metrics_disabled_config = json!(
+    let remote_settings_config = json!(
         {
-            "category.string_metric": true
+            "metrics_enabled": {
+                "category.string_metric": false
+            }
         }
     )
     .to_string();
-    glean.set_metrics_disabled_config(
-        MetricsDisabledConfig::try_from(metrics_disabled_config).unwrap(),
-    );
+    glean
+        .apply_server_knobs_config(RemoteSettingsConfig::try_from(remote_settings_config).unwrap());
 
     // 3. Ensure the epoch updated
     current_epoch = glean.remote_settings_epoch.load(Ordering::Acquire);
@@ -951,15 +1065,16 @@ fn test_remote_settings_epoch_updates_in_metric() {
     );
 
     // 2. Set a configuration to disable the `category.string_metric`
-    let metrics_disabled_config = json!(
+    let remote_settings_config = json!(
         {
-            "category.string_metric": true
+            "metrics_enabled": {
+                "category.string_metric": false
+            }
         }
     )
     .to_string();
-    glean.set_metrics_disabled_config(
-        MetricsDisabledConfig::try_from(metrics_disabled_config).unwrap(),
-    );
+    glean
+        .apply_server_knobs_config(RemoteSettingsConfig::try_from(remote_settings_config).unwrap());
 
     // 3. Ensure the epoch was updated
     let current_epoch = glean.remote_settings_epoch.load(Ordering::Acquire);
@@ -989,7 +1104,7 @@ fn test_empty_application_id() {
     let dir = tempfile::tempdir().unwrap();
     let tmpname = dir.path().display().to_string();
 
-    let glean = Glean::with_options(&tmpname, "", true);
+    let glean = Glean::with_options(&tmpname, "", true, true);
     // Check that this is indeed the first run.
     assert!(glean.is_first_run());
 }
@@ -1003,15 +1118,17 @@ fn records_database_file_size() {
     let dir = tempfile::tempdir().unwrap();
     let tmpname = dir.path().display().to_string();
 
-    // Initialize Glean once to ensure we create the database.
-    let glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true);
+    // Initialize Glean once to ensure we create the database and did not error.
+    let glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true, true);
     let database_size = &glean.database_metrics.size;
     let data = database_size.get_value(&glean, "metrics");
+
     assert!(data.is_none());
+
     drop(glean);
 
     // Initialize Glean again to record file size.
-    let glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true);
+    let glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true, true);
 
     let database_size = &glean.database_metrics.size;
     let data = database_size.get_value(&glean, "metrics");
@@ -1020,6 +1137,11 @@ fn records_database_file_size() {
 
     // We should see the database containing some data.
     assert!(data.sum > 0);
+
+    let rkv_load_state = &glean.database_metrics.rkv_load_error;
+    let rkv_load_error = rkv_load_state.get_value(&glean, "metrics");
+
+    assert_eq!(rkv_load_error, None);
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -1064,7 +1186,7 @@ fn test_activity_api() {
     let _ = env_logger::builder().is_test(true).try_init();
 
     let dir = tempfile::tempdir().unwrap();
-    let (mut glean, _) = new_glean(Some(dir));
+    let (mut glean, _t) = new_glean(Some(dir));
 
     // Signal that the client was active.
     glean.handle_client_active();
@@ -1075,6 +1197,111 @@ fn test_activity_api() {
     // Signal back that client is ianctive.
     glean.handle_client_inactive();
 
-    // Check that we set everything we needed for the 'inactuve' status.
+    // Check that we set everything we needed for the 'inactive' status.
     assert!(!glean.is_dirty_flag_set());
+}
+
+#[test]
+fn disabled_pings_are_not_submitted() {
+    let _ = env_logger::builder().is_test(true).try_init();
+
+    let dir = tempfile::tempdir().unwrap();
+    let (mut glean, _t) = new_glean(Some(dir));
+
+    let ping = PingType::new_internal(
+        "custom-disabled",
+        true,
+        false,
+        true,
+        true,
+        false,
+        vec![],
+        vec![],
+        true,
+    );
+    glean.register_ping_type(&ping);
+
+    // We need to store a metric as an empty ping is not stored.
+    let counter = CounterMetric::new(CommonMetricData {
+        name: "counter".into(),
+        category: "local".into(),
+        send_in_pings: vec!["custom-disabled".into()],
+        ..Default::default()
+    });
+    counter.add_sync(&glean, 1);
+
+    assert!(!ping.submit_sync(&glean, None));
+}
+
+#[test]
+fn internal_pings_can_be_disabled() {
+    let _ = env_logger::builder().is_test(true).try_init();
+
+    let dir = tempfile::tempdir().unwrap();
+    let tmpname = dir.path().display().to_string();
+    let glean = Glean::with_options(&tmpname, GLOBAL_APPLICATION_ID, true, false);
+
+    // We need to store a metric as an empty ping is not stored.
+    let counter = CounterMetric::new(CommonMetricData {
+        name: "counter".into(),
+        category: "local".into(),
+        send_in_pings: vec!["baseline".into()],
+        ..Default::default()
+    });
+    counter.add_sync(&glean, 1);
+
+    let submitted = glean.internal_pings.baseline.submit_sync(&glean, None);
+    assert!(!submitted);
+}
+
+#[test]
+fn pings_are_controllable_from_remote_settings_config() {
+    let _ = env_logger::builder().is_test(true).try_init();
+
+    let dir = tempfile::tempdir().unwrap();
+    let (mut glean, _t) = new_glean(Some(dir));
+
+    let disabled_ping = PingType::new(
+        "custom-disabled",
+        true,
+        true,
+        true,
+        true,
+        false,
+        vec![],
+        vec![],
+        true,
+    );
+    glean.register_ping_type(&disabled_ping);
+    let enabled_ping = PingType::new(
+        "custom-enabled",
+        true,
+        true,
+        true,
+        true,
+        true,
+        vec![],
+        vec![],
+        true,
+    );
+    glean.register_ping_type(&enabled_ping);
+
+    assert!(!disabled_ping.submit_sync(&glean, None));
+    assert!(enabled_ping.submit_sync(&glean, None));
+
+    // Now, create a configuration to switch the enabled state of the two pings
+    let remote_settings_config = json!(
+        {
+            "pings_enabled": {
+                "custom-disabled": true,
+                "custom-enabled": false
+            }
+        }
+    )
+    .to_string();
+    glean
+        .apply_server_knobs_config(RemoteSettingsConfig::try_from(remote_settings_config).unwrap());
+
+    assert!(disabled_ping.submit_sync(&glean, None));
+    assert!(!enabled_ping.submit_sync(&glean, None));
 }

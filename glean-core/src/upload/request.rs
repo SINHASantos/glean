@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 use chrono::prelude::{DateTime, Utc};
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
-use serde_json::{self, Value as JsonValue};
+use serde_json::Value as JsonValue;
 use std::io::prelude::*;
 
 use crate::error::{ErrorKind, Result};
@@ -18,7 +18,7 @@ use crate::system;
 pub type HeaderMap = HashMap<String, String>;
 
 /// Creates a formatted date string that can be used with Date headers.
-fn create_date_header_value(current_time: DateTime<Utc>) -> String {
+pub(crate) fn create_date_header_value(current_time: DateTime<Utc>) -> String {
     // Date headers are required to be in the following format:
     //
     // <day-name>, <day> <month> <year> <hour>:<minute>:<second> GMT
@@ -62,13 +62,14 @@ pub struct Builder {
     body: Option<Vec<u8>>,
     headers: HeaderMap,
     body_max_size: usize,
+    body_has_info_sections: Option<bool>,
+    ping_name: Option<String>,
 }
 
 impl Builder {
     /// Creates a new builder for a PingRequest.
     pub fn new(language_binding_name: &str, body_max_size: usize) -> Self {
         let mut headers = HashMap::new();
-        headers.insert("Date".to_string(), create_date_header_value(Utc::now()));
         headers.insert(
             "X-Telemetry-Agent".to_string(),
             create_x_telemetry_agent_header_value(
@@ -88,6 +89,8 @@ impl Builder {
             body: None,
             headers,
             body_max_size,
+            body_has_info_sections: None,
+            ping_name: None,
         }
     }
 
@@ -139,6 +142,18 @@ impl Builder {
         self
     }
 
+    /// Sets whether the request body has {client|ping}_info sections.
+    pub fn body_has_info_sections(mut self, body_has_info_sections: bool) -> Self {
+        self.body_has_info_sections = Some(body_has_info_sections);
+        self
+    }
+
+    /// Sets the ping's name aka doctype.
+    pub fn ping_name<S: Into<String>>(mut self, ping_name: S) -> Self {
+        self.ping_name = Some(ping_name.into());
+        self
+    }
+
     /// Sets a header for this request.
     pub fn header<S: Into<String>>(mut self, key: S, value: S) -> Self {
         self.headers.insert(key.into(), value.into());
@@ -175,6 +190,12 @@ impl Builder {
                 .expect("path must be set before attempting to build PingRequest"),
             body,
             headers: self.headers,
+            body_has_info_sections: self.body_has_info_sections.expect(
+                "body_has_info_sections must be set before attempting to build PingRequest",
+            ),
+            ping_name: self
+                .ping_name
+                .expect("ping_name must be set before attempting to build PingRequest"),
         })
     }
 }
@@ -193,6 +214,10 @@ pub struct PingRequest {
     pub body: Vec<u8>,
     /// A map with all the headers to be sent with the request.
     pub headers: HeaderMap,
+    /// Whether the body has {client|ping}_info sections.
+    pub body_has_info_sections: bool,
+    /// The ping's name. Likely also somewhere in `path`.
+    pub ping_name: String,
 }
 
 impl PingRequest {
@@ -209,12 +234,7 @@ impl PingRequest {
 
     /// Verifies if current request is for a deletion-request ping.
     pub fn is_deletion_request(&self) -> bool {
-        // The path format should be `/submit/<app_id>/<ping_name>/<schema_version/<doc_id>`
-        self.path
-            .split('/')
-            .nth(3)
-            .map(|url| url == "deletion-request")
-            .unwrap_or(false)
+        self.ping_name == "deletion-request"
     }
 
     /// Decompresses and pretty-format the ping payload
@@ -258,17 +278,23 @@ mod test {
             .document_id("woop")
             .path("/random/path/doesnt/matter")
             .body("{}")
+            .body_has_info_sections(false)
+            .ping_name("whatevs")
             .build()
             .unwrap();
 
         assert_eq!(request.document_id, "woop");
         assert_eq!(request.path, "/random/path/doesnt/matter");
+        assert!(!request.body_has_info_sections);
+        assert_eq!(request.ping_name, "whatevs");
 
         // Make sure all the expected headers were added.
-        assert!(request.headers.contains_key("Date"));
         assert!(request.headers.contains_key("X-Telemetry-Agent"));
         assert!(request.headers.contains_key("Content-Type"));
         assert!(request.headers.contains_key("Content-Length"));
+
+        // the `Date` header is added by the `get_upload_task` just before
+        // returning the upload request
     }
 
     #[test]

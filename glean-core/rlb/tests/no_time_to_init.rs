@@ -10,7 +10,7 @@
 
 mod common;
 
-use glean::Configuration;
+use glean::ConfigurationBuilder;
 
 /// Some user metrics.
 mod metrics {
@@ -40,8 +40,19 @@ mod pings {
     use once_cell::sync::Lazy;
 
     #[allow(non_upper_case_globals)]
-    pub static validation: Lazy<PingType> =
-        Lazy::new(|| glean::private::PingType::new("validation", true, true, vec![]));
+    pub static validation: Lazy<PingType> = Lazy::new(|| {
+        glean::private::PingType::new(
+            "validation",
+            true,
+            true,
+            true,
+            true,
+            true,
+            vec![],
+            vec![],
+            true,
+        )
+    });
 }
 
 /// Test scenario: Glean initialization fails.
@@ -57,16 +68,9 @@ fn init_fails() {
     let dir = tempfile::tempdir().unwrap();
     let tmpname = dir.path().to_path_buf();
 
-    let cfg = Configuration {
-        data_path: tmpname,
-        application_id: "firefox-desktop".into(), // An empty application ID is invalid.
-        upload_enabled: true,
-        max_events: None,
-        delay_ping_lifetime_io: false,
-        server_endpoint: Some("invalid-test-host".into()),
-        uploader: None,
-        use_core_mps: false,
-    };
+    let cfg = ConfigurationBuilder::new(true, tmpname, "firefox-desktop")
+        .with_server_endpoint("invalid-test-host")
+        .build();
     common::initialize(cfg);
 
     metrics::initialization.stop();

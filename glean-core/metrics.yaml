@@ -75,6 +75,25 @@ glean.internal.metrics:
       - glean-team@mozilla.com
     expires: never
 
+  windows_build_number:
+    type: quantity
+    lifetime: application
+    send_in_pings:
+      - glean_client_info
+    description: |
+      The optional Windows build number, reported by Windows
+      (e.g. 22000) and not set for other platforms.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1802094
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1802094
+    data_sensitivity:
+      - technical
+    notification_emails:
+      - glean-team@mozilla.com
+    expires: never
+    unit: build_number
+
   device_manufacturer:
     type: string
     lifetime: application
@@ -318,7 +337,7 @@ glean.internal.metrics:
 
   start_time:
     type: datetime
-    time_unit: minute
+    time_unit: millisecond
     lifetime: user
     send_in_pings:
       - glean_internal_info
@@ -327,6 +346,7 @@ glean.internal.metrics:
       in local time and with minute precision, including timezone information.
     bugs:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1556966
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1827852
     data_reviews:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1512938#c3
     data_sensitivity:
@@ -337,7 +357,7 @@ glean.internal.metrics:
 
   end_time:
     type: datetime
-    time_unit: minute
+    time_unit: millisecond
     lifetime: ping
     send_in_pings:
       - glean_internal_info
@@ -348,6 +368,7 @@ glean.internal.metrics:
       and is likely well before ping transmission time.
     bugs:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1556966
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1827852
     data_reviews:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1512938#c3
     data_sensitivity:
@@ -369,6 +390,25 @@ glean.internal.metrics:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1557048
     data_reviews:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1609218#c4
+    data_sensitivity:
+      - technical
+    notification_emails:
+      - glean-team@mozilla.com
+    expires: never
+
+glean.client.annotation:
+  experimentation_id:
+    type: string
+    lifetime: application
+    send_in_pings:
+      - all-pings
+    description: |
+      An experimentation identifier derived and provided by the application
+      for the purpose of experimentation enrollment.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1848201
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1848201#c5
     data_sensitivity:
       - technical
     notification_emails:
@@ -460,8 +500,6 @@ glean.error:
       Only sent if the buffer ever overflows.
 
       In Version 0 this reported the total number of tasks enqueued.
-    unit:
-      tasks
     bugs:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1609482
     data_reviews:
@@ -588,6 +626,70 @@ glean.upload:
     no_lint:
       - COMMON_PREFIX
 
+  send_success:
+    type: timing_distribution
+    time_unit: millisecond
+    description: |
+      Time needed for a successful send of a ping to the servers and getting a reply back
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1814592
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1814592#c3
+    data_sensitivity:
+      - technical
+    notification_emails:
+      - glean-team@mozilla.com
+      - jrediger@mozilla.com
+    expires: never
+
+  send_failure:
+    type: timing_distribution
+    time_unit: millisecond
+    description: |
+      Time needed for a failed send of a ping to the servers and getting a reply back.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1814592
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1814592#c3
+    data_sensitivity:
+      - technical
+    notification_emails:
+      - glean-team@mozilla.com
+      - jrediger@mozilla.com
+    expires: never
+
+  in_flight_pings_dropped:
+    type: counter
+    description: |
+      How many pings were dropped because we found them already in-flight.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1816401
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1816401
+    data_sensitivity:
+      - technical
+    notification_emails:
+      - glean-team@mozilla.com
+      - chutten@mozilla.com
+    expires: never
+
+  missing_send_ids:
+    type: counter
+    description: |
+      How many ping upload responses did we not record as a success or failure
+      (in `glean.upload.send_success` or `glean.upload.send_failue`,
+      respectively) due to an inconsistency in our internal bookkeeping?
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1816400
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1816400
+    data_sensitivity:
+      - technical
+    notification_emails:
+      - glean-team@mozilla.com
+      - chutten@mozilla.com
+    expires: never
+
 glean.database:
   size:
     type: memory_distribution
@@ -603,6 +705,37 @@ glean.database:
     notification_emails:
       - glean-team@mozilla.com
     expires: never
+
+  rkv_load_error:
+    type: string
+    description: |
+      If there was an error loading the RKV database, record it.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1815253
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1815253
+    data_sensitivity:
+      - technical
+    notification_emails:
+      - glean-team@mozilla.com
+    expires: never
+
+  write_time:
+    type: timing_distribution
+    time_unit: microsecond
+    description: |
+      The time it takes for a write-commit for the Glean database.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1896193
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1896193#c4
+    data_sensitivity:
+      - technical
+    notification_emails:
+      - glean-team@mozilla.com
+      - jrediger@mozilla.com
+    expires: never
+    disabled: true
 
 glean.validation:
   foreground_count:
@@ -623,7 +756,7 @@ glean.validation:
   pings_submitted:
     type: labeled_counter
     description: |
-      A count of the pings submitted, by ping type.
+      A count of the built-in pings submitted, by ping type.
 
       This metric appears in both the metrics and baseline pings.
 
@@ -631,6 +764,9 @@ glean.validation:
         the last metrics ping (including the last metrics ping)
       - On the baseline ping, the counts include the number of pings send since
         the last baseline ping (including the last baseline ping)
+
+      Note: Previously this also recorded the number of submitted custom pings.
+      Now it only records counts for the Glean built-in pings.
     send_in_pings:
       - metrics
       - baseline
@@ -644,6 +780,39 @@ glean.validation:
       - glean-team@mozilla.com
     expires:
       never
+
+  shutdown_wait:
+    type: timing_distribution
+    time_unit: millisecond
+    description: |
+      Time waited for the uploader at shutdown.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1814592
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1814592#c3
+    data_sensitivity:
+      - technical
+    notification_emails:
+      - glean-team@mozilla.com
+      - jrediger@mozilla.com
+    expires: never
+
+  shutdown_dispatcher_wait:
+    type: timing_distribution
+    time_unit: millisecond
+    description: |
+      Time waited for the dispatcher to unblock during shutdown.
+      Most samples are expected to be below the 10s timeout used.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1828066
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1828066#c7
+    data_sensitivity:
+      - technical
+    notification_emails:
+      - glean-team@mozilla.com
+      - jrediger@mozilla.com
+    expires: never
 
 glean:
   restarted:

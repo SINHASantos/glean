@@ -73,7 +73,7 @@ acessibility.features["high_contrast"].set(this.isHighContrastEnabled());
 
 **C++**
 ```cpp
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/AccessibleMetrics.h"
 
 mozilla::glean::accessibility::features.Get("screen_reader"_ns).Set(true);
 mozilla::glean::accessibility::features.Get("high_contrast"_ns).Set(false);
@@ -104,6 +104,8 @@ Glean.accessibility.features["high_contrast"].set(false);
 Gets the recorded value for a given label in a labeled boolean metric.  
 Returns the count if data is stored.  
 Returns a language-specific empty/null value if no data is stored.
+Has an optional argument to specify the name of the ping you wish to retrieve data from, except
+in Rust where it's required. `None` or no argument will default to the first value found for `send_in_pings`.
 
 {{#include ../../../shared/tab_header.md}}
 
@@ -175,7 +177,7 @@ assert(!(await accessibility.features["high_contrast"].testGetValue()));
 
 **C++**
 ```cpp
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/AccessibleMetrics.h"
 
 ASSERT_EQ(
     true,
@@ -314,6 +316,5 @@ accessibility:
 ## Reference
 
 * Swift API docs: [`LabeledMetricType`](../../../swift/Classes/LabeledMetricType.html), [`BooleanMetricType`](../../../swift/Classes/BooleanMetricType.html)
-* Python API docs: [`LabeledMetricBase`](../../../python/glean/metrics/labeled.html), [`BooleanMetricType`](../../../python/glean/metrics/boolean.html)
+* Python API docs: [`LabeledBooleanMetricType`](../../../python/glean/metrics/labeled.html#glean.metrics.labeled.LabeledBooleanMetricType), [`BooleanMetricType`](../../../python/glean/metrics/index.html#glean.metrics.BooleanMetric)
 * Rust API docs: [`LabeledMetric`](../../../docs/glean/private/struct.LabeledMetric.html), [`BooleanMetricType`](../../../docs/glean/private/struct.BooleanMetric.html)
-* JavaScript API docs: [`LabeledMetricType`](https://mozilla.github.io/glean.js/classes/core_metrics_types_labeled.default.html), [`BooleanMetricType`](https://mozilla.github.io/glean.js/classes/core_metrics_types_boolean.default.html)

@@ -13,6 +13,8 @@ import mozilla.telemetry.glean.getWorkerStatus
 import mozilla.telemetry.glean.resetGlean
 import mozilla.telemetry.glean.testing.GleanTestRule
 import mozilla.telemetry.glean.triggerWorkManager
+import mozilla.telemetry.glean.utils.decompressGZIP
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -63,9 +65,10 @@ class DeletionPingTest {
         resetGlean(
             context,
             Glean.configuration.copy(
-                serverEndpoint = "http://" + server.hostName + ":" + server.port
+                serverEndpoint = "http://" + server.hostName + ":" + server.port,
             ),
-            clearStores = true, uploadEnabled = false
+            clearStores = true,
+            uploadEnabled = false,
         )
         triggerWorkManager(context)
 
@@ -82,16 +85,17 @@ class DeletionPingTest {
         resetGlean(
             context,
             Glean.configuration.copy(
-                serverEndpoint = "http://" + server.hostName + ":" + server.port
+                serverEndpoint = "http://" + server.hostName + ":" + server.port,
             ),
-            clearStores = true, uploadEnabled = true
+            clearStores = true,
+            uploadEnabled = true,
         )
 
         // Get directory for pending deletion-request pings
         val pendingDeletionRequestDir = File(Glean.getDataDir(), DELETION_PING_DIR)
 
         // Disabling upload generates a deletion ping
-        Glean.setUploadEnabled(false)
+        Glean.setCollectionEnabled(false)
         triggerWorkManager(context)
 
         val request = server.takeRequest(2L, TimeUnit.SECONDS)!!
@@ -103,7 +107,7 @@ class DeletionPingTest {
 
         // Re-setting upload to `false` should not generate an additional ping
         // and no worker should be scheduled.
-        Glean.setUploadEnabled(false)
+        Glean.setCollectionEnabled(false)
 
         assertFalse(getWorkerStatus(context, PingUploadWorker.PING_WORKER_TAG).isEnqueued)
         // No new file should have been written
@@ -140,9 +144,10 @@ class DeletionPingTest {
         resetGlean(
             context,
             Glean.configuration.copy(
-                serverEndpoint = "http://" + server.hostName + ":" + server.port
+                serverEndpoint = "http://" + server.hostName + ":" + server.port,
             ),
-            clearStores = true, uploadEnabled = false
+            clearStores = true,
+            uploadEnabled = false,
         )
         triggerWorkManager(context)
 
@@ -159,5 +164,39 @@ class DeletionPingTest {
 
         // 'baseline' ping is removed from disk.
         assertEquals(0, pendingPingDir.listFiles()?.size)
+    }
+
+    @Test
+    fun `deletion-request pings include experimentation id`() {
+        val server = getMockWebServer()
+        val context = getContext()
+
+        resetGlean(
+            context,
+            Glean.configuration.copy(
+                serverEndpoint = "http://" + server.hostName + ":" + server.port,
+                experimentationId = "alpha-beta-gamma-delta",
+            ),
+            clearStores = true,
+            uploadEnabled = true,
+        )
+
+        // Disabling upload generates a deletion ping
+        Glean.setCollectionEnabled(false)
+        triggerWorkManager(context)
+
+        val request = server.takeRequest(2L, TimeUnit.SECONDS)!!
+        val docType = request.path!!.split("/")[3]
+        assertEquals("deletion-request", docType)
+
+        val body = decompressGZIP(request.body.readByteArray())
+
+        // Parse the body back into JSON
+        val deletionPing = JSONObject(body)
+        val metrics = deletionPing.getJSONObject("metrics")
+        val strings = metrics.getJSONObject("string")
+        val experimentationId = strings.getString("glean.client.annotation.experimentation_id")
+
+        assertEquals("Experimentation ids must match", "alpha-beta-gamma-delta", experimentationId)
     }
 }

@@ -5,33 +5,9 @@
 package mozilla.telemetry.glean.private
 
 import androidx.annotation.VisibleForTesting
+import mozilla.telemetry.glean.Dispatchers
 import mozilla.telemetry.glean.internal.EventMetric
 import mozilla.telemetry.glean.testing.ErrorType
-
-/**
- * The ability to convert an enum key back to its string representation.
- * This is necessary because Glean-generated enum values are camelCased,
- * so an enum's `name` property doesn't match the allowed key.
- *
- * This is automatically implemented for generated enums.
- */
-interface EventExtraKey {
-    fun keyName(): String = throw IllegalStateException("can't serialize this key")
-}
-
-/**
- * An enum with no values for convenient use as the default set of extra keys
- * that an [EventMetricType] can accept.
- */
-@Suppress("EmptyClassBlock")
-enum class NoExtraKeys(
-    /**
-     * @suppress
-     */
-    val value: Int
-) : EventExtraKey {
-    // deliberately empty
-}
 
 /**
  * A class that can be converted into key-value pairs of event extras.
@@ -67,14 +43,11 @@ class NoExtras : EventExtras {
  * The Events API only exposes the [record] method, which takes care of validating the input
  * data and making sure that limits are enforced.
  */
-class EventMetricType<ExtraKeysEnum, ExtraObject> internal constructor(
-    private var inner: EventMetric
-) where ExtraKeysEnum : Enum<ExtraKeysEnum>, ExtraKeysEnum : EventExtraKey, ExtraObject : EventExtras {
-    /**
-     * The public constructor used by automatically generated metrics.
-     */
-    constructor(meta: CommonMetricData, allowedExtraKeys: List<String>) :
-        this(inner = EventMetric(meta, allowedExtraKeys))
+class EventMetricType<ExtraObject> constructor(
+    private var meta: CommonMetricData,
+    private var allowedExtraKeys: List<String>,
+) where ExtraObject : EventExtras {
+    val inner: EventMetric by lazy { EventMetric(meta, allowedExtraKeys) }
 
     /**
      * Record an event by using the information provided by the instance of this class.
@@ -88,7 +61,9 @@ class EventMetricType<ExtraKeysEnum, ExtraObject> internal constructor(
      *       If no `extra` data is passed the above function will be invoked correctly.
      */
     fun record(extra: ExtraObject? = null) {
-        inner.record(extra?.toExtraRecord() ?: emptyMap())
+        Dispatchers.Delayed.launch {
+            inner.record(extra?.toExtraRecord() ?: emptyMap())
+        }
     }
 
     /**

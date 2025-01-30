@@ -1,4 +1,4 @@
-personal_ws-1.1 en 253 utf-8
+personal_ws-1.1 en 295 utf-8
 AAR
 AARs
 ABI
@@ -9,6 +9,7 @@ AndroidX
 AppServices
 BEHAVIOUR
 BUGFIX
+Backported
 Bool
 Booleans
 CLI
@@ -17,6 +18,7 @@ CODEOWNERS
 Cartfile
 CircleCI
 Ciufo
+Codebase
 DNS
 DOM
 Datetime
@@ -25,7 +27,9 @@ Dependabot
 Droettboom
 FOG
 FTE
+FeatureManifest
 Fenix
+Fournier
 Frictionless
 Fritzsche
 Funday
@@ -38,6 +42,7 @@ Gradle
 Grapheme
 Hotfix
 Howtos
+ISPs
 JDK
 JNA
 JNI
@@ -52,6 +57,7 @@ LLDB
 LMDB
 Lockwise
 MPL
+MacBooks
 Makefile
 Mingw
 Miniconda
@@ -75,6 +81,8 @@ SDK's
 SDKs
 SRE
 Solaris
+Sourcegraph
+StringList
 TLDs
 TODO
 TSan
@@ -90,14 +98,20 @@ UUIDs
 Unbreak
 Underflowing
 UniFFI
+UploadManager
 Uploaders
+VPN
+Walkthrough
+Walkthroughs
 Wasm
 WebRender
 Webpack
+WorkManager
 XCFramework
 Xcode
 YAML
 aarch
+addon
 alphanumerics
 analytics
 anonymized
@@ -105,17 +119,21 @@ aspell
 async
 autodetected
 backend
+backgrounding
 backoff
 backport
 barcode
+behaviour
 bincode
 bindgen
+biometric
 bool
 boolean
 booleans
 brizental
 bugfixes
 camelCase
+cancelled
 carthage
 changelog
 chutten
@@ -136,6 +154,7 @@ datetime
 destructor
 deterministically
 dev
+devtools
 dexter
 distributable
 docstrings
@@ -145,9 +164,12 @@ enqueue
 enqueued
 enum
 envs
+etl
 exe
 experimentId
 ffi
+fi
+frontend
 func
 gfritzsche
 glibc
@@ -156,11 +178,15 @@ gradle
 grcov
 gzip
 gzipped
+homescreen
 hotfix
 html
+iMacs
 illumos
 init
+initializer
 inlined
+instrumentations
 integrations
 io
 ios
@@ -171,6 +197,7 @@ ktlint
 lang
 latencies
 lfloor
+libstd's
 lifecycle
 linter
 linux
@@ -178,6 +205,7 @@ logPings
 logcat
 macOS
 manylinux
+maturin
 md
 mdbook
 mdroettboom
@@ -193,6 +221,7 @@ npm
 ns
 ol
 ons
+outputter
 pdoc
 perrymcmanis
 pidcat
@@ -204,9 +233,11 @@ preinit
 py
 pytest
 rethrow
+retransmission
 rfloor
 rkv
 rkv's
+rollout
 rollouts
 runtime
 runtimes
@@ -228,6 +259,7 @@ substring
 swiftlint
 tcsh
 templating
+th
 timespan
 timespan's
 timespans
@@ -236,6 +268,7 @@ toolchain
 toolchains
 tooltip
 tooltips
+tos
 transpiler
 travis
 und
@@ -245,11 +278,19 @@ uniffi
 unminified
 uploader
 uploaders
+urlbar
+validator
 vendored
 vendoring
+virtualenv
+walkthrough
+walkthroughs
 webextension
 webpages
+whatsys
+wi
 xcframework
+xcode
 xcpretty
 yaml
 zsh

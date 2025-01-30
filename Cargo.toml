@@ -1,4 +1,5 @@
 [workspace]
+resolver = "2"
 
 members = [
   "glean-core",
@@ -12,7 +13,6 @@ members = [
 
 default-members = [
   "glean-core",
-  "glean-core/rlb",
   "tools/embedded-uniffi-bindgen",
 ]
 
@@ -20,3 +20,9 @@ default-members = [
 opt-level = "s"
 debug = false
 lto = true
+
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+
+[profile.dev.package.flate2]
+opt-level = 3

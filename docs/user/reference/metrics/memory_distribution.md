@@ -96,7 +96,7 @@ function allocateMemory() {
 **C++**
 
 ```c++
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/JsXpconnectMetrics.h"
 
 mozilla::glean::memory::heap_allocated.Accumulate(bytes / 1024);
 ```
@@ -123,6 +123,8 @@ Glean.memory.heapAllocated.accumulate(bytes / 1024);
 Gets the recorded value for a given memory distribution metric.  
 Returns a struct with counts per buckets and total sum if data is stored.  
 Returns a language-specific empty/null value if no data is stored.
+Has an optional argument to specify the name of the ping you wish to retrieve data from, except
+in Rust where it's required. `None` or no argument will default to the first value found for `send_in_pings`.
 
 {{#include ../../../shared/tab_header.md}}
 
@@ -234,7 +236,7 @@ assert.equal(2, snapshot.count);
 **C++**
 
 ```c++
-#include "mozilla/glean/GleanMetrics.h"
+#include "mozilla/glean/JsXpconnectMetrics.h"
 
 // Does it have an expected values?
 const data = mozilla::glean::memory::heap_allocated.TestGetValue().value().unwrap()
@@ -380,7 +382,7 @@ The allowed values for `memory_unit` are:
 ## Reference
 
 * [Swift API docs](../../../swift/Classes/MemoryDistributionMetricType.html)
-* [Python API docs](../../../python/glean/metrics/timing_distribution.html)
+* [Python API docs](../../../python/glean/metrics/index.html#glean.metrics.TimingDistributionMetricType)
 * [Rust API docs](../../../docs/glean/private/struct.MemoryDistributionMetric.html)
 
 ## Simulator
